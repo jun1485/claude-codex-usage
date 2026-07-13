@@ -1,0 +1,143 @@
+{
+  "name": "claude-codex-usage-monitor",
+  "displayName": "AI Usage Meter",
+  "description": "%ext.description%",
+  "version": "0.1.9",
+  "publisher": "jjju",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jun1485/claude-codex-usage.git"
+  },
+  "icon": "assets/marketplace-icon.png",
+  "l10n": "./l10n",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "codex",
+    "anthropic",
+    "openai",
+    "usage",
+    "rate limit",
+    "statusbar"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "icons": {
+      "claude-usage-logo": {
+        "description": "Claude logo",
+        "default": {
+          "fontPath": "./assets/usage-icons.woff",
+          "fontCharacter": "\\E900"
+        }
+      },
+      "codex-usage-logo": {
+        "description": "Codex (OpenAI) logo",
+        "default": {
+          "fontPath": "./assets/usage-icons.woff",
+          "fontCharacter": "\\E901"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "claudeCodexUsage.refresh",
+        "title": "%cmd.refresh.title%",
+        "category": "AI Usage Meter"
+      },
+      {
+        "command": "claudeCodexUsage.openSettings",
+        "title": "%cmd.openSettings.title%",
+        "category": "AI Usage Meter"
+      },
+      {
+        "command": "claudeCodexUsage.openMenu",
+        "title": "%cmd.openMenu.title%",
+        "category": "AI Usage Meter"
+      }
+    ],
+    "configuration": {
+      "title": "AI Usage Meter",
+      "properties": {
+        "claudeCodexUsage.warningThreshold": {
+          "type": "number",
+          "default": 80,
+          "order": 1,
+          "description": "%cfg.warningThreshold%"
+        },
+        "claudeCodexUsage.errorThreshold": {
+          "type": "number",
+          "default": 95,
+          "order": 2,
+          "description": "%cfg.errorThreshold%"
+        },
+        "claudeCodexUsage.refreshIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "order": 3,
+          "description": "%cfg.refreshInterval%"
+        },
+        "claudeCodexUsage.displayMode": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "full"
+          ],
+          "enumDescriptions": [
+            "%cfg.displayMode.compact%",
+            "%cfg.displayMode.full%"
+          ],
+          "default": "compact",
+          "order": 4,
+          "description": "%cfg.displayMode%"
+        },
+        "claudeCodexUsage.claude.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 5,
+          "description": "%cfg.claude.enabled%"
+        },
+        "claudeCodexUsage.claude.credentialsPath": {
+          "type": "string",
+          "default": "",
+          "order": 6,
+          "description": "%cfg.claude.credentialsPath%"
+        },
+        "claudeCodexUsage.codex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 7,
+          "description": "%cfg.codex.enabled%"
+        },
+        "claudeCodexUsage.codex.sessionsPath": {
+          "type": "string",
+          "default": "",
+          "order": 8,
+          "description": "%cfg.codex.sessionsPath%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.4.0"
+  }
+}

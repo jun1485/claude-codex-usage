@@ -1,0 +1,16 @@
+{
+  "ext.description": "Claude Code와 Codex CLI의 사용량 한도(5시간/주간)를 상태바에 표시",
+  "cmd.refresh.title": "사용량 새로고침",
+  "cmd.openSettings.title": "설정 열기",
+  "cmd.openMenu.title": "메뉴 열기",
+  "cfg.refreshInterval": "사용량 갱신 주기(초)",
+  "cfg.displayMode": "상태바 표시 형식",
+  "cfg.displayMode.compact": "5시간 사용률만 표시 (예: 5h 7% (2d 5h))",
+  "cfg.displayMode.full": "모든 구간 표시 (예: 5h 7% · 7d 41% (2d 5h))",
+  "cfg.warningThreshold": "이 사용률(%) 이상이면 주황색 경고 배경 표시",
+  "cfg.errorThreshold": "이 사용률(%) 이상이면 빨간색 위험 배경 표시",
+  "cfg.claude.enabled": "Claude Code 사용량 표시",
+  "cfg.claude.credentialsPath": "Claude 인증 파일 경로 (비워두면 ~/.claude/.credentials.json)",
+  "cfg.codex.enabled": "Codex CLI 사용량 표시",
+  "cfg.codex.sessionsPath": "Codex 세션 로그 디렉터리 (비워두면 ~/.codex/sessions)"
+}

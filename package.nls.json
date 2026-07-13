@@ -1,0 +1,16 @@
+{
+  "ext.description": "Show Claude Code & Codex CLI usage limits (5-hour / weekly) in the status bar",
+  "cmd.refresh.title": "Refresh Usage",
+  "cmd.openSettings.title": "Open Settings",
+  "cmd.openMenu.title": "Open Menu",
+  "cfg.refreshInterval": "Refresh interval in seconds",
+  "cfg.displayMode": "Status bar display format",
+  "cfg.displayMode.compact": "Show the 5-hour usage only, e.g. 5h 7% (2d 5h)",
+  "cfg.displayMode.full": "Show all windows, e.g. 5h 7% · 7d 41% (2d 5h)",
+  "cfg.warningThreshold": "Show an orange warning background at or above this usage (%)",
+  "cfg.errorThreshold": "Show a red error background at or above this usage (%)",
+  "cfg.claude.enabled": "Show Claude Code usage",
+  "cfg.claude.credentialsPath": "Claude credentials file path (empty = ~/.claude/.credentials.json)",
+  "cfg.codex.enabled": "Show Codex CLI usage",
+  "cfg.codex.sessionsPath": "Codex session log directory (empty = ~/.codex/sessions)"
+}
