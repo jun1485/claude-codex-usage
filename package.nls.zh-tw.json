@@ -1,0 +1,16 @@
+{
+  "ext.description": "在狀態列顯示 Claude Code 與 Codex CLI 的用量限制（5小時/每週）",
+  "cmd.refresh.title": "重新整理用量",
+  "cmd.openSettings.title": "開啟設定",
+  "cmd.openMenu.title": "開啟選單",
+  "cfg.refreshInterval": "用量重新整理間隔（秒）",
+  "cfg.displayMode": "狀態列顯示格式",
+  "cfg.displayMode.compact": "僅顯示5小時用量，例如 5h 7% (2d 5h)",
+  "cfg.displayMode.full": "顯示所有時間視窗，例如 5h 7% · 7d 41% (2d 5h)",
+  "cfg.warningThreshold": "用量達到該百分比(%)以上時顯示橘色警告背景",
+  "cfg.errorThreshold": "用量達到該百分比(%)以上時顯示紅色警示背景",
+  "cfg.claude.enabled": "顯示 Claude Code 用量",
+  "cfg.claude.credentialsPath": "Claude 憑證檔案路徑（留空 = ~/.claude/.credentials.json）",
+  "cfg.codex.enabled": "顯示 Codex CLI 用量",
+  "cfg.codex.sessionsPath": "Codex 工作階段日誌目錄（留空 = ~/.codex/sessions）"
+}
