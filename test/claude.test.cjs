@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const Module = require('node:module');
 const test = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 
 const originalFetch = global.fetch;
 const originalLoad = Module._load;
@@ -49,7 +50,7 @@ test('첫 429 응답 이후 캐시가 없어도 추가 요청을 차단한다', 
   let calls = 0;
   global.fetch = async () => {
     calls += 1;
-    return { ok: false, status: 429 };
+    return { ok: false, status: 429, headers: new Map() };
   };
   const { fetchClaudeUsage } = loadClaude();
 
@@ -61,6 +62,37 @@ test('첫 429 응답 이후 캐시가 없어도 추가 요청을 차단한다', 
   assert.equal(calls, 1);
 });
 
+// Retry-After 헤더 유예 시간 검증
+test('429 Retry-After 헤더의 유예 시간이 지나면 다시 요청한다', async () => {
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    if (calls === 1) {
+      return { ok: false, status: 429, headers: new Map([['retry-after', '1']]) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      text: async () =>
+        JSON.stringify({
+          five_hour: { utilization: 12, resets_at: '2026-07-16T02:00:00.000Z' },
+        }),
+    };
+  };
+  const { fetchClaudeUsage } = loadClaude();
+
+  await fetchClaudeUsage('credentials.json');
+  const blocked = await fetchClaudeUsage('credentials.json');
+  assert.equal(blocked.status, 'error');
+  assert.equal(calls, 1);
+
+  await delay(1100);
+  const after = await fetchClaudeUsage('credentials.json');
+  assert.equal(after.status, 'ok');
+  assert.equal(calls, 2);
+});
+
 // 네트워크 오류 캐시 상태 검증
 test('성공 데이터 이후 네트워크 오류가 나면 지연 상태를 표시한다', async () => {
   let calls = 0;
@@ -70,6 +102,7 @@ test('성공 데이터 이후 네트워크 오류가 나면 지연 상태를 표
       return {
         ok: true,
         status: 200,
+        headers: new Map(),
         text: async () =>
           JSON.stringify({
             five_hour: {
