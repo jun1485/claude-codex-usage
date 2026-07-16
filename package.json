@@ -1,31 +1,63 @@
 {
   "name": "claude-codex-usage-monitor",
-  "displayName": "AI Usage Meter",
+  "displayName": "Claude Code Usage & Codex Usage",
   "description": "%ext.description%",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "publisher": "jjju",
   "license": "MIT",
+  "pricing": "Free",
   "repository": {
     "type": "git",
     "url": "https://github.com/jun1485/claude-codex-usage.git"
   },
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor",
+  "bugs": {
+    "url": "https://github.com/jun1485/claude-codex-usage/issues"
+  },
   "icon": "assets/marketplace-icon.png",
+  "galleryBanner": {
+    "color": "#1F2937",
+    "theme": "dark"
+  },
   "l10n": "./l10n",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Visualization",
     "Other"
   ],
   "keywords": [
-    "claude",
+    "claude usage",
     "claude code",
-    "codex",
+    "claude code usage",
+    "claude usage monitor",
+    "claude rate limit",
+    "claude quota",
+    "codex usage",
+    "codex cli",
+    "codex cli usage",
+    "codex usage monitor",
+    "codex rate limit",
+    "codex quota",
+    "claude codex usage",
+    "usage monitor",
+    "rate limit monitor",
+    "quota monitor",
+    "ai usage",
+    "status bar",
+    "statusbar",
     "anthropic",
     "openai",
-    "usage",
-    "rate limit",
-    "statusbar"
+    "vscode",
+    "cursor",
+    "cursor extension",
+    "windsurf",
+    "windsurf extension",
+    "vscodium",
+    "open vsx",
+    "클로드 사용량",
+    "코덱스 사용량"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -52,21 +84,21 @@
       {
         "command": "claudeCodexUsage.refresh",
         "title": "%cmd.refresh.title%",
-        "category": "AI Usage Meter"
+        "category": "Claude & Codex Usage"
       },
       {
         "command": "claudeCodexUsage.openSettings",
         "title": "%cmd.openSettings.title%",
-        "category": "AI Usage Meter"
+        "category": "Claude & Codex Usage"
       },
       {
         "command": "claudeCodexUsage.openMenu",
         "title": "%cmd.openMenu.title%",
-        "category": "AI Usage Meter"
+        "category": "Claude & Codex Usage"
       }
     ],
     "configuration": {
-      "title": "AI Usage Meter",
+      "title": "Claude & Codex Usage",
       "properties": {
         "claudeCodexUsage.warningThreshold": {
           "type": "number",
