@@ -71,12 +71,16 @@
         "claudeCodexUsage.warningThreshold": {
           "type": "number",
           "default": 80,
+          "minimum": 0,
+          "maximum": 100,
           "order": 1,
           "description": "%cfg.warningThreshold%"
         },
         "claudeCodexUsage.errorThreshold": {
           "type": "number",
           "default": 95,
+          "minimum": 0,
+          "maximum": 100,
           "order": 2,
           "description": "%cfg.errorThreshold%"
         },
@@ -131,12 +135,13 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "test": "npm run compile && node --test test/claude.test.cjs test/retrying-watcher.test.cjs test/single-flight.test.cjs test/view.test.cjs",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "1.85.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.4.0"
   }

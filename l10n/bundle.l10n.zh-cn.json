@@ -5,6 +5,8 @@
   "Claude OAuth token missing (run claude, then /login)": "缺少 Claude OAuth 令牌（运行 claude 后执行 /login）",
   "Claude token expired (renews automatically when Claude Code runs)": "Claude 令牌已过期（运行 Claude Code 时自动续期）",
   "Usage API rate limited (429)": "用量 API 请求受限（429）",
+  "Usage API request timed out": "用量 API 请求超时",
+  "Showing last successful data": "正在显示上次成功获取的数据",
   "Usage API error (HTTP {0})": "用量 API 错误（HTTP {0}）",
   "No usage data in the API response": "API 响应中没有用量数据",
   "Network error while fetching usage": "获取用量时发生网络错误",

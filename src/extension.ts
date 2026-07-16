@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { fetchClaudeUsage } from './claude';
 import { fetchCodexUsage, resolveSessionsPath } from './codex';
+import { RetryingWatcher } from './retrying-watcher';
+import { SingleFlight } from './single-flight';
 import { buildStatusText, buildTooltip, DisplayMode, pickSeverity, Severity } from './view';
 import { UsageResult } from './types';
 
@@ -25,17 +27,25 @@ interface ExtensionConfig {
 }
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
-let sessionsWatcher: fs.FSWatcher | undefined;
 let watchDebounce: ReturnType<typeof setTimeout> | undefined;
+const providerRequests = new SingleFlight<UsageResult>();
+const sessionsWatcher = new RetryingWatcher(15_000);
+
+// 사용률 임계값 범위 제한
+function normalizeThreshold(value: number): number {
+  return Math.min(100, Math.max(0, value));
+}
 
 // 사용자 설정 스냅샷 조회
 function getConfig(): ExtensionConfig {
   const cfg = vscode.workspace.getConfiguration('claudeCodexUsage');
+  const warningThreshold = normalizeThreshold(cfg.get<number>('warningThreshold', 80));
+  const errorThreshold = Math.max(warningThreshold, normalizeThreshold(cfg.get<number>('errorThreshold', 95)));
   return {
     refreshIntervalSeconds: Math.max(15, cfg.get<number>('refreshIntervalSeconds', 60)),
     displayMode: cfg.get<DisplayMode>('displayMode', 'compact'),
-    warningThreshold: cfg.get<number>('warningThreshold', 80),
-    errorThreshold: cfg.get<number>('errorThreshold', 95),
+    warningThreshold,
+    errorThreshold,
     claudeEnabled: cfg.get<boolean>('claude.enabled', true),
     codexEnabled: cfg.get<boolean>('codex.enabled', true),
     claudeCredentialsPath: cfg.get<string>('claude.credentialsPath', ''),
@@ -82,22 +92,27 @@ async function refreshAll(bindings: ProviderBinding[]): Promise<void> {
         return;
       }
       const customPath = binding.id === 'claude' ? config.claudeCredentialsPath : config.codexSessionsPath;
-      const result = await binding.fetch(customPath);
-      render(binding, result, config);
+      const result = await providerRequests.run(`${binding.id}:${customPath}`, () => binding.fetch(customPath));
+      const latestConfig = getConfig();
+      const stillEnabled = binding.id === 'claude' ? latestConfig.claudeEnabled : latestConfig.codexEnabled;
+      if (!stillEnabled) {
+        binding.item.hide();
+        return;
+      }
+      render(binding, result, latestConfig);
     }),
   );
 }
 
 // Codex 세션 로그 감시 재설정 (변경 감지 시 Codex 사용량 즉시 갱신)
 function restartCodexWatcher(bindings: ProviderBinding[]): void {
-  sessionsWatcher?.close();
-  sessionsWatcher = undefined;
+  sessionsWatcher.stop();
   const config = getConfig();
   if (!config.codexEnabled) {
     return;
   }
-  try {
-    sessionsWatcher = fs.watch(resolveSessionsPath(config.codexSessionsPath), { recursive: true }, () => {
+  sessionsWatcher.start((handleError) => {
+    const watcher = fs.watch(resolveSessionsPath(config.codexSessionsPath), { recursive: true }, () => {
       // 연속 쓰기 이벤트 debounce 후 Codex만 갱신
       if (watchDebounce) {
         clearTimeout(watchDebounce);
@@ -106,14 +121,9 @@ function restartCodexWatcher(bindings: ProviderBinding[]): void {
         void refreshAll(bindings.filter((binding) => binding.id === 'codex'));
       }, 2000);
     });
-    // 감시 오류 시 감시 중단 후 폴링만 유지
-    sessionsWatcher.on('error', () => {
-      sessionsWatcher?.close();
-      sessionsWatcher = undefined;
-    });
-  } catch {
-    // 세션 디렉터리 부재 시 폴링만 사용
-  }
+    watcher.on('error', handleError);
+    return watcher;
+  });
 }
 
 // 갱신 주기 타이머 재설정
@@ -147,8 +157,14 @@ async function showQuickMenu(bindings: ProviderBinding[]): Promise<void> {
       action: 'toggleCodex',
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
-    { label: `$(gear) ${vscode.l10n.t('Open Settings')}`, action: 'openSettings' },
-    { label: `$(refresh) ${vscode.l10n.t('Refresh Usage')}`, action: 'refresh' },
+    {
+      label: `$(gear) ${vscode.l10n.t('Open Settings')}`,
+      action: 'openSettings',
+    },
+    {
+      label: `$(refresh) ${vscode.l10n.t('Refresh Usage')}`,
+      action: 'refresh',
+    },
   ];
   const picked = await vscode.window.showQuickPick(items, {
     placeHolder: vscode.l10n.t('Toggle visibility or open settings'),
@@ -178,25 +194,29 @@ async function showQuickMenu(bindings: ProviderBinding[]): Promise<void> {
 
 // 확장 활성화 시 상태바 아이템 생성·주기 갱신 시작
 export function activate(context: vscode.ExtensionContext): void {
-  const claudeItem = vscode.window.createStatusBarItem(
-    'claudeCodexUsage.claude',
-    vscode.StatusBarAlignment.Right,
-    101,
-  );
+  const claudeItem = vscode.window.createStatusBarItem('claudeCodexUsage.claude', vscode.StatusBarAlignment.Right, 101);
   claudeItem.name = vscode.l10n.t('Claude Code Usage');
   claudeItem.command = 'claudeCodexUsage.openMenu';
 
-  const codexItem = vscode.window.createStatusBarItem(
-    'claudeCodexUsage.codex',
-    vscode.StatusBarAlignment.Right,
-    100,
-  );
+  const codexItem = vscode.window.createStatusBarItem('claudeCodexUsage.codex', vscode.StatusBarAlignment.Right, 100);
   codexItem.name = vscode.l10n.t('Codex CLI Usage');
   codexItem.command = 'claudeCodexUsage.openMenu';
 
   const bindings: ProviderBinding[] = [
-    { id: 'claude', title: vscode.l10n.t('Claude Code Usage'), icon: 'claude-usage-logo', item: claudeItem, fetch: fetchClaudeUsage },
-    { id: 'codex', title: vscode.l10n.t('Codex CLI Usage'), icon: 'codex-usage-logo', item: codexItem, fetch: fetchCodexUsage },
+    {
+      id: 'claude',
+      title: vscode.l10n.t('Claude Code Usage'),
+      icon: 'claude-usage-logo',
+      item: claudeItem,
+      fetch: fetchClaudeUsage,
+    },
+    {
+      id: 'codex',
+      title: vscode.l10n.t('Codex CLI Usage'),
+      icon: 'codex-usage-logo',
+      item: codexItem,
+      fetch: fetchCodexUsage,
+    },
   ];
 
   context.subscriptions.push(
@@ -237,6 +257,5 @@ export function deactivate(): void {
     clearTimeout(watchDebounce);
     watchDebounce = undefined;
   }
-  sessionsWatcher?.close();
-  sessionsWatcher = undefined;
+  sessionsWatcher.stop();
 }

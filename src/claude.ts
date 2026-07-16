@@ -6,6 +6,8 @@ import { l10n } from 'vscode';
 import { UsageResult, UsageWindow } from './types';
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
+const REQUEST_TIMEOUT_MS = 10_000;
+const RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000;
 // User-Agent 누락 시 저한도 버킷으로 분류되어 429 발생
 const FALLBACK_CLI_VERSION = '2.1.207';
 let cliVersionPromise: Promise<string> | null = null;
@@ -40,7 +42,7 @@ function cliPackageJsonCandidates(): string[] {
 function versionFromCli(): Promise<string | null> {
   return new Promise((resolve) => {
     exec('claude --version', { timeout: 5000, windowsHide: true }, (error, stdout) => {
-      resolve(error ? null : stdout.match(/\d+\.\d+\.\d+/)?.[0] ?? null);
+      resolve(error ? null : (stdout.match(/\d+\.\d+\.\d+/)?.[0] ?? null));
     });
   });
 }
@@ -99,6 +101,20 @@ interface ClaudeUsageResponse {
 let backoffUntil = 0;
 let lastResult: UsageResult | null = null;
 
+// 마지막 성공 데이터 지연 상태 표시
+function staleLastResult(): UsageResult | null {
+  if (lastResult?.status !== 'ok') {
+    return lastResult;
+  }
+  return {
+    status: 'ok',
+    data: {
+      ...lastResult.data,
+      sourceNote: l10n.t('Showing last successful data'),
+    },
+  };
+}
+
 // Claude 인증 파일 기본 경로 결정
 function resolveCredentialsPath(customPath: string): string {
   return customPath || path.join(os.homedir(), '.claude', '.credentials.json');
@@ -148,8 +164,14 @@ function toWindows(usage: ClaudeUsageResponse): UsageWindow[] {
 
 // Claude OAuth usage API 조회
 export async function fetchClaudeUsage(customCredentialsPath: string): Promise<UsageResult> {
-  if (Date.now() < backoffUntil && lastResult) {
-    return lastResult;
+  // 429 유예 기간 추가 요청 차단
+  if (Date.now() < backoffUntil) {
+    return (
+      staleLastResult() ?? {
+        status: 'error',
+        message: l10n.t('Usage API rate limited (429)'),
+      }
+    );
   }
 
   let credentials: ClaudeCredentials;
@@ -157,41 +179,65 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
     const raw = await fs.readFile(resolveCredentialsPath(customCredentialsPath), 'utf8');
     credentials = JSON.parse(raw);
   } catch {
-    return { status: 'missing', message: l10n.t('Not logged in to Claude (run claude, then /login)') };
+    return {
+      status: 'missing',
+      message: l10n.t('Not logged in to Claude (run claude, then /login)'),
+    };
   }
 
   const token = credentials.claudeAiOauth?.accessToken;
   if (!token) {
-    return { status: 'missing', message: l10n.t('Claude OAuth token missing (run claude, then /login)') };
+    return {
+      status: 'missing',
+      message: l10n.t('Claude OAuth token missing (run claude, then /login)'),
+    };
   }
 
+  const cliVersion = await detectCliVersion();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(USAGE_URL, {
       method: 'GET',
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${token}`,
         'anthropic-beta': 'oauth-2025-04-20',
-        'User-Agent': `claude-code/${await detectCliVersion()}`,
+        'User-Agent': `claude-code/${cliVersion}`,
         'Content-Type': 'application/json',
       },
     });
 
     if (response.status === 401 || response.status === 403) {
-      return { status: 'error', message: l10n.t('Claude token expired (renews automatically when Claude Code runs)') };
+      return {
+        status: 'error',
+        message: l10n.t('Claude token expired (renews automatically when Claude Code runs)'),
+      };
     }
     if (response.status === 429) {
       // 과도 호출 방지 유예 후 마지막 데이터 유지
-      backoffUntil = Date.now() + 5 * 60 * 1000;
-      return lastResult ?? { status: 'error', message: l10n.t('Usage API rate limited (429)') };
+      backoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS;
+      return (
+        staleLastResult() ?? {
+          status: 'error',
+          message: l10n.t('Usage API rate limited (429)'),
+        }
+      );
     }
     if (!response.ok) {
-      return { status: 'error', message: l10n.t('Usage API error (HTTP {0})', response.status) };
+      return {
+        status: 'error',
+        message: l10n.t('Usage API error (HTTP {0})', response.status),
+      };
     }
 
     const usage: ClaudeUsageResponse = JSON.parse(await response.text());
     const windows = toWindows(usage);
     if (windows.length === 0) {
-      return { status: 'error', message: l10n.t('No usage data in the API response') };
+      return {
+        status: 'error',
+        message: l10n.t('No usage data in the API response'),
+      };
     }
 
     lastResult = {
@@ -204,7 +250,20 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
       },
     };
     return lastResult;
-  } catch {
-    return lastResult ?? { status: 'error', message: l10n.t('Network error while fetching usage') };
+  } catch (error) {
+    const staleResult = staleLastResult();
+    if (staleResult) {
+      return staleResult;
+    }
+    return {
+      status: 'error',
+      message: l10n.t(
+        error instanceof Error && error.name === 'AbortError'
+          ? 'Usage API request timed out'
+          : 'Network error while fetching usage',
+      ),
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
