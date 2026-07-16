@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.3.0 — 2026-07-16
+
+- Claude credentials fall back to the macOS Keychain when the credentials file is absent
+- Codex session watching now works on Linux (VS Code file watcher instead of recursive fs.watch)
+- Codex reset times are computed from the log timestamp; windows already past their reset show 0%
+- Claude 429 backoff honors the Retry-After header; expired tokens skip the network call
+- Claude stale-data cache resets when the credentials path setting changes
+- Codex session scan reads only the newest log files (faster with large histories)
+- Refresh pauses while the window is unfocused and resumes on focus
+- Status bar shows a loading indicator until the first fetch completes
+- Status bar items hide automatically when a tool is not installed
+- Tooltip marks usage windows above the warning/error thresholds
+- Warning severity now matches the rounded percent shown in the status bar
+- Bundled with esbuild; ESLint, Prettier, CI workflow, and pre-release tests added
+- Marketplace metrics: previous-snapshot lookup now paginates issue comments
+
 ## 0.2.0
 
 - Marketplace title, description, keywords, categories, and listing links improved for Claude Code and Codex usage searches
