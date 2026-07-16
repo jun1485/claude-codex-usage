@@ -2,7 +2,7 @@
   "name": "claude-codex-usage-monitor",
   "displayName": "Claude Code Usage & Codex Usage",
   "description": "%ext.description%",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "jjju",
   "license": "MIT",
   "pricing": "Free",
@@ -62,7 +62,11 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./out/extension.js",
+  "extensionKind": [
+    "workspace",
+    "ui"
+  ],
+  "main": "./dist/extension.js",
   "contributes": {
     "icons": {
       "claude-usage-logo": {
@@ -165,9 +169,13 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run bundle",
     "compile": "tsc -p ./",
-    "test": "npm run compile && node --test test/claude.test.cjs test/retrying-watcher.test.cjs test/single-flight.test.cjs test/view.test.cjs",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 --minify",
+    "bundle:dev": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "npm run compile && node --test \"test/*.test.cjs\"",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },
@@ -175,6 +183,10 @@
     "@types/node": "^18.19.0",
     "@types/vscode": "1.85.0",
     "@vscode/vsce": "^3.0.0",
-    "typescript": "^5.4.0"
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.0.0"
   }
 }
