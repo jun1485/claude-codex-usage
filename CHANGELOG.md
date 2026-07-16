@@ -14,6 +14,7 @@
 - Tooltip marks usage windows above the warning/error thresholds
 - Warning severity now matches the rounded percent shown in the status bar
 - Bundled with esbuild; ESLint, Prettier, CI workflow, and pre-release tests added
+- CI runs on Linux, Windows, and macOS; release workflow guards tag/version mismatch and is safely re-runnable
 - Marketplace metrics: previous-snapshot lookup now paginates issue comments
 
 ## 0.2.0
