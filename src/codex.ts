@@ -2,11 +2,14 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { l10n } from 'vscode';
-import { UsageResult, UsageWindow } from './types';
+import { UsageResult, UsageWindow, WindowKind } from './types';
 
 // 세션 로그 탐색 상한
 const MAX_FILES_TO_SCAN = 8;
+const MAX_FILES_TO_COLLECT = 24;
 const TAIL_READ_BYTES = 256 * 1024;
+// 세션 구간 판별 상한 (분)
+const SESSION_WINDOW_MAX_MINUTES = 360;
 
 interface CodexRateWindow {
   used_percent?: number | null;
@@ -34,18 +37,23 @@ export function resolveSessionsPath(customPath: string): string {
   return customPath || path.join(os.homedir(), '.codex', 'sessions');
 }
 
-// 디렉터리 재귀 순회로 jsonl 파일 수집
-async function collectJsonlFiles(dir: string, out: string[]): Promise<void> {
+// 이름 역순 우선 순회로 최신 jsonl 파일 수집
+async function collectRecentJsonlFiles(dir: string, out: string[], limit: number): Promise<void> {
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
     return;
   }
+  // 연/월/일 디렉터리 구조 최신 날짜 우선 순회
+  entries.sort((a, b) => b.name.localeCompare(a.name));
   for (const entry of entries) {
+    if (out.length >= limit) {
+      return;
+    }
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await collectJsonlFiles(full, out);
+      await collectRecentJsonlFiles(full, out, limit);
     } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
       out.push(full);
     }
@@ -77,37 +85,61 @@ function extractRateLimits(line: string): CodexRateLimits | null {
   }
 }
 
-// 리셋 시각 변환 (epoch 초 또는 남은 초)
-function parseResetsAt(window: CodexRateWindow): Date | null {
+// 리셋 시각 변환 (epoch 초 또는 기록 시점 기준 남은 초)
+function parseResetsAt(window: CodexRateWindow, recordedAt: Date): Date | null {
   if (typeof window.resets_at === 'number') {
     return new Date(window.resets_at * 1000);
   }
   if (typeof window.resets_in_seconds === 'number') {
-    return new Date(Date.now() + window.resets_in_seconds * 1000);
+    return new Date(recordedAt.getTime() + window.resets_in_seconds * 1000);
   }
   return null;
 }
 
-// 윈도우 길이(분) 기준 구간 분류
-function toUsageWindow(window: CodexRateWindow | null | undefined): UsageWindow | null {
+// 윈도우 길이(분) 기준 구간 분류 (누락 시 기본 구간)
+function classifyWindow(window: CodexRateWindow, fallbackKind: WindowKind): WindowKind {
+  if (typeof window.window_minutes !== 'number' || window.window_minutes <= 0) {
+    return fallbackKind;
+  }
+  return window.window_minutes <= SESSION_WINDOW_MAX_MINUTES ? 'session' : 'weekly';
+}
+
+// 사용량 구간 변환 (리셋 경과 시 0% 처리)
+function toUsageWindow(
+  window: CodexRateWindow | null | undefined,
+  fallbackKind: WindowKind,
+  recordedAt: Date,
+): UsageWindow | null {
   if (!window || typeof window.used_percent !== 'number') {
     return null;
   }
-  const minutes = window.window_minutes ?? 0;
-  const isSession = minutes > 0 && minutes <= 360;
+  const kind = classifyWindow(window, fallbackKind);
+  const resetsAt = parseResetsAt(window, recordedAt);
+  // 리셋 시각 경과 데이터 만료 처리
+  const expired = resetsAt !== null && resetsAt.getTime() <= Date.now();
   return {
-    kind: isSession ? 'session' : 'weekly',
-    label: isSession ? '5h' : '7d',
-    percent: window.used_percent,
-    resetsAt: parseResetsAt(window),
+    kind,
+    label: kind === 'session' ? '5h' : '7d',
+    percent: expired ? 0 : window.used_percent,
+    resetsAt: expired ? null : resetsAt,
   };
 }
 
 // 최신 세션 로그에서 Codex 사용량 조회
 export async function fetchCodexUsage(customSessionsPath: string): Promise<UsageResult> {
   const sessionsDir = resolveSessionsPath(customSessionsPath);
+  try {
+    await fs.access(sessionsDir);
+  } catch {
+    // 기본 경로 디렉터리 자체가 없으면 미설치 처리
+    return {
+      status: customSessionsPath ? 'missing' : 'absent',
+      message: l10n.t('No Codex session logs (run codex to populate)'),
+    };
+  }
+
   const files: string[] = [];
-  await collectJsonlFiles(sessionsDir, files);
+  await collectRecentJsonlFiles(sessionsDir, files, MAX_FILES_TO_COLLECT);
   if (files.length === 0) {
     return { status: 'missing', message: l10n.t('No Codex session logs (run codex to populate)') };
   }
@@ -141,9 +173,12 @@ export async function fetchCodexUsage(customSessionsPath: string): Promise<Usage
       if (!rateLimits) {
         continue;
       }
-      const windows = [toUsageWindow(rateLimits.primary), toUsageWindow(rateLimits.secondary)]
+      const windows = [
+        toUsageWindow(rateLimits.primary, 'session', mtime),
+        toUsageWindow(rateLimits.secondary, 'weekly', mtime),
+      ]
         .filter((w): w is UsageWindow => w !== null)
-        .sort((a, b) => (a.kind === 'session' ? -1 : 1) - (b.kind === 'session' ? -1 : 1));
+        .sort((a, b) => (a.kind === 'session' ? 0 : 1) - (b.kind === 'session' ? 0 : 1));
       if (windows.length === 0) {
         continue;
       }
