@@ -175,6 +175,7 @@
     "bundle:dev": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18 --sourcemap",
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "test": "npm run compile && node --test \"test/*.test.cjs\"",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
@@ -183,7 +184,7 @@
     "@types/node": "^18.19.0",
     "@types/vscode": "1.85.0",
     "@vscode/vsce": "^3.0.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.4.0",
