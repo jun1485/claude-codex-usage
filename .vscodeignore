@@ -4,7 +4,10 @@ scripts/**
 test/**
 src/**
 node_modules/**
-out/**/*.map
+out/**
+dist/**/*.map
 tsconfig.json
+eslint.config.mjs
+.prettierrc.json
 .gitignore
 **/*.vsix
