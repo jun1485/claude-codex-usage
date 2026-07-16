@@ -73,7 +73,7 @@ async function getSearchRank(query) {
 // Marketplace 공개 지표 스냅샷 생성
 async function collectSnapshot() {
   const [extensions, ranks] = await Promise.all([
-    queryMarketplace([{ filterType: 10, value: EXTENSION_ID }]),
+    queryMarketplace([{ filterType: 7, value: EXTENSION_ID }]),
     Promise.all(SEARCH_QUERIES.map(getSearchRank)),
   ]);
   const extension = extensions.find(
@@ -207,11 +207,20 @@ async function createMetricsIssue(repository, report) {
   });
 }
 
-// Marketplace 지표 이슈 댓글 조회
-async function getIssueComments(repository, issueNumber) {
-  return requestGitHub(
-    `/repos/${repository}/issues/${issueNumber}/comments?per_page=100`,
-  );
+// 지표 이슈 최신 스냅샷 조회 (마지막 댓글 페이지부터 역순)
+async function findPreviousSnapshot(repository, issue) {
+  const lastPage = Math.max(1, Math.ceil(issue.comments / 100));
+  for (let page = lastPage; page >= 1; page -= 1) {
+    const comments = await requestGitHub(
+      `/repos/${repository}/issues/${issue.number}/comments?per_page=100&page=${page}`,
+    );
+    const snapshot = [...comments]
+      .reverse()
+      .map((comment) => extractSnapshot(comment.body))
+      .find(Boolean);
+    if (snapshot) return snapshot;
+  }
+  return extractSnapshot(issue.body);
 }
 
 // Marketplace 지표 이슈 댓글 추가
@@ -245,12 +254,7 @@ async function main() {
   }
 
   // 기존 지표 추적 이슈 갱신
-  const comments = await getIssueComments(repository, issue.number);
-  const previous =
-    [...comments]
-      .reverse()
-      .map((comment) => extractSnapshot(comment.body))
-      .find(Boolean) ?? extractSnapshot(issue.body);
+  const previous = await findPreviousSnapshot(repository, issue);
   await addIssueComment(
     repository,
     issue.number,

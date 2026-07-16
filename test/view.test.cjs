@@ -17,7 +17,7 @@ Module._load = function load(request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { buildStatusText } = require('../out/view');
+const { buildStatusText, pickSeverity } = require('../out/view');
 
 // 사용량 테스트 스냅샷 생성
 function createSnapshot(now) {
@@ -69,4 +69,16 @@ test('full 모드는 각 사용량 구간의 초기화 시간을 표시한다', 
   } finally {
     Date.now = originalNow;
   }
+});
+
+// 표시값·경고 단계 반올림 일치 검증
+test('경고 단계는 표시와 같은 반올림 값 기준으로 판정한다', () => {
+  const data = {
+    windows: [{ kind: 'session', label: '5h', percent: 94.6, resetsAt: null }],
+    plan: null,
+    fetchedAt: new Date(),
+    sourceNote: null,
+  };
+  assert.equal(pickSeverity(data, 80, 95), 'error');
+  assert.equal(pickSeverity({ ...data, windows: [{ ...data.windows[0], percent: 94.4 }] }, 80, 95), 'warning');
 });

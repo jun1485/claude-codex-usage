@@ -56,9 +56,9 @@ export function buildStatusText(data: UsageSnapshot, mode: DisplayMode): string 
   return formatWindowStatus(primary);
 }
 
-// 사용률 최고치 기준 경고 단계 판정
+// 사용률 최고치 기준 경고 단계 판정 (표시 반올림 값 기준)
 export function pickSeverity(data: UsageSnapshot, warningThreshold: number, errorThreshold: number): Severity {
-  const maxPercent = Math.max(...data.windows.map((w) => w.percent));
+  const maxPercent = Math.max(...data.windows.map((w) => Math.round(w.percent)));
   if (maxPercent >= errorThreshold) {
     return 'error';
   }
@@ -105,13 +105,31 @@ function buildMeter(percent: number): string {
   return '▰'.repeat(filled) + '▱'.repeat(10 - filled);
 }
 
+// 임계값 초과 구간 경고 아이콘 결정
+function severityIcon(percent: number, warningThreshold: number, errorThreshold: number): string {
+  const rounded = Math.round(percent);
+  if (rounded >= errorThreshold) {
+    return '$(error) ';
+  }
+  if (rounded >= warningThreshold) {
+    return '$(warning) ';
+  }
+  return '';
+}
+
 // 상태바 툴팁 마크다운 구성
-export function buildTooltip(icon: string, title: string, data: UsageSnapshot): vscode.MarkdownString {
+export function buildTooltip(
+  icon: string,
+  title: string,
+  data: UsageSnapshot,
+  warningThreshold: number,
+  errorThreshold: number,
+): vscode.MarkdownString {
   const planSuffix = data.plan ? ` · ${vscode.l10n.t('Plan')} ${data.plan}` : '';
   const lines: string[] = [`$(${icon}) **${title}**${planSuffix}`];
   for (const window of data.windows) {
     lines.push(
-      `${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}**${formatResetDetail(window.resetsAt)}`,
+      `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}**${formatResetDetail(window.resetsAt)}`,
     );
   }
   const sourceSuffix = data.sourceNote ? ` · ${data.sourceNote}` : '';

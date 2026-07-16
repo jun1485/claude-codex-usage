@@ -21,4 +21,5 @@ export interface UsageSnapshot {
 export type UsageResult =
   | { status: 'ok'; data: UsageSnapshot }
   | { status: 'missing'; message: string }
+  | { status: 'absent'; message: string }
   | { status: 'error'; message: string };
