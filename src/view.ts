@@ -35,9 +35,10 @@ function pickPrimaryWindow(windows: UsageWindow[]): UsageWindow | null {
   return windows.find((w) => w.kind === 'session') ?? windows.find((w) => w.kind === 'weekly') ?? windows[0] ?? null;
 }
 
-// 괄호에 넣을 리셋 기준 구간 선택 (주간 우선)
-function pickResetWindow(windows: UsageWindow[]): UsageWindow | null {
-  return windows.find((w) => w.kind === 'weekly' && w.resetsAt) ?? windows.find((w) => w.resetsAt) ?? null;
+// 사용량 구간 상태 문구 구성
+function formatWindowStatus(window: UsageWindow): string {
+  const remaining = formatRemaining(window.resetsAt);
+  return `${window.label} ${formatPercent(window.percent)}${remaining ? ` (${remaining})` : ''}`;
 }
 
 // 상태바 본문 텍스트 구성
@@ -46,18 +47,13 @@ export function buildStatusText(data: UsageSnapshot, mode: DisplayMode): string 
   if (!primary) {
     return '--';
   }
-  const resetWindow = pickResetWindow(data.windows);
-  const remaining = formatRemaining(resetWindow?.resetsAt ?? null);
-  const suffix = remaining ? ` (${remaining})` : '';
-
   if (mode === 'full') {
-    const body = data.windows
+    return data.windows
       .filter((w) => w.kind !== 'scoped')
-      .map((w) => `${w.label} ${formatPercent(w.percent)}`)
+      .map(formatWindowStatus)
       .join(' · ');
-    return `${body}${suffix}`;
   }
-  return `${primary.label} ${formatPercent(primary.percent)}${suffix}`;
+  return formatWindowStatus(primary);
 }
 
 // 사용률 최고치 기준 경고 단계 판정
