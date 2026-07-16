@@ -1,4 +1,6 @@
 .vscode/**
+.github/**
+scripts/**
 src/**
 node_modules/**
 out/**/*.map

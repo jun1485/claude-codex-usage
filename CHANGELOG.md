@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.2.0
+
+- Marketplace title, description, keywords, categories, and listing links improved for Claude Code and Codex usage searches
+- README title and introduction aligned with the Marketplace listing
+- Open VSX distribution and install links added for Cursor, Windsurf, and VSCodium
+- Weekly Marketplace search rank, install, rating, and review tracking added
+- Status bar reset time matched to each displayed usage window
+- Claude 429 backoff, request timeout, stale-data notice, and refresh deduplication added
+- Codex session watcher automatically reconnects when the sessions directory appears later
+- Warning and error thresholds constrained to a valid order within 0–100
+- Core regression tests added
+
 ## 0.1.9
 
 - Settings order: warning threshold, then error threshold, then refresh interval
