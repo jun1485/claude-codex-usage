@@ -5,6 +5,8 @@
   "Claude OAuth token missing (run claude, then /login)": "Claude OAuth 토큰 없음 (claude 실행 후 /login)",
   "Claude token expired (renews automatically when Claude Code runs)": "Claude 토큰 만료 (claude 실행 시 자동 갱신)",
   "Usage API rate limited (429)": "usage API 요청 제한(429)",
+  "Usage API request timed out": "usage API 요청 시간 초과",
+  "Showing last successful data": "마지막 성공 데이터 표시 중",
   "Usage API error (HTTP {0})": "usage API 오류 (HTTP {0})",
   "No usage data in the API response": "usage 응답에 사용량 정보 없음",
   "Network error while fetching usage": "네트워크 오류로 조회 실패",
