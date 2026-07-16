@@ -28,6 +28,8 @@ interface ExtensionConfig {
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let watchDebounce: ReturnType<typeof setTimeout> | undefined;
+// 비포커스 중 보류된 갱신 존재 여부
+let refreshSkippedWhileUnfocused = false;
 const providerRequests = new SingleFlight<UsageResult>();
 const sessionsWatcher = new RetryingWatcher(15_000);
 
@@ -67,9 +69,20 @@ function severityBackground(severity: Severity): vscode.ThemeColor | undefined {
 // 조회 결과를 상태바 아이템에 반영
 function render(binding: ProviderBinding, result: UsageResult, config: ExtensionConfig): void {
   const { item } = binding;
+  // 도구 미설치 시 상태바 미표시
+  if (result.status === 'absent') {
+    item.hide();
+    return;
+  }
   if (result.status === 'ok') {
     item.text = `$(${binding.icon}) ${buildStatusText(result.data, config.displayMode)}`;
-    item.tooltip = buildTooltip(binding.icon, binding.title, result.data);
+    item.tooltip = buildTooltip(
+      binding.icon,
+      binding.title,
+      result.data,
+      config.warningThreshold,
+      config.errorThreshold,
+    );
     item.backgroundColor = severityBackground(
       pickSeverity(result.data, config.warningThreshold, config.errorThreshold),
     );
@@ -111,18 +124,28 @@ function restartCodexWatcher(bindings: ProviderBinding[]): void {
   if (!config.codexEnabled) {
     return;
   }
-  sessionsWatcher.start((handleError) => {
-    const watcher = fs.watch(resolveSessionsPath(config.codexSessionsPath), { recursive: true }, () => {
-      // 연속 쓰기 이벤트 debounce 후 Codex만 갱신
+  sessionsWatcher.start(() => {
+    const sessionsDir = resolveSessionsPath(config.codexSessionsPath);
+    // 디렉터리 생성 전 감시 보류 (재시도 예약)
+    if (!fs.existsSync(sessionsDir)) {
+      throw new Error('sessions directory missing');
+    }
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(vscode.Uri.file(sessionsDir), '**/*.jsonl'),
+    );
+    // 연속 쓰기 이벤트 debounce 후 Codex만 갱신
+    const scheduleRefresh = () => {
       if (watchDebounce) {
         clearTimeout(watchDebounce);
       }
       watchDebounce = setTimeout(() => {
         void refreshAll(bindings.filter((binding) => binding.id === 'codex'));
       }, 2000);
-    });
-    watcher.on('error', handleError);
-    return watcher;
+    };
+    watcher.onDidCreate(scheduleRefresh);
+    watcher.onDidChange(scheduleRefresh);
+    watcher.onDidDelete(scheduleRefresh);
+    return { close: () => watcher.dispose() };
   });
 }
 
@@ -132,6 +155,11 @@ function restartTimer(bindings: ProviderBinding[]): void {
     clearInterval(refreshTimer);
   }
   refreshTimer = setInterval(() => {
+    // 창 비포커스 시 폴링 보류
+    if (!vscode.window.state.focused) {
+      refreshSkippedWhileUnfocused = true;
+      return;
+    }
     void refreshAll(bindings);
   }, getConfig().refreshIntervalSeconds * 1000);
 }
@@ -240,7 +268,24 @@ export function activate(context: vscode.ExtensionContext): void {
         void refreshAll(bindings);
       }
     }),
+    // 포커스 복귀 시 보류된 갱신 즉시 실행
+    vscode.window.onDidChangeWindowState((state) => {
+      if (state.focused && refreshSkippedWhileUnfocused) {
+        refreshSkippedWhileUnfocused = false;
+        void refreshAll(bindings);
+      }
+    }),
   );
+
+  // 최초 조회 완료 전 로딩 표시
+  const initialConfig = getConfig();
+  for (const binding of bindings) {
+    const enabled = binding.id === 'claude' ? initialConfig.claudeEnabled : initialConfig.codexEnabled;
+    if (enabled) {
+      binding.item.text = `$(${binding.icon}) $(loading~spin)`;
+      binding.item.show();
+    }
+  }
 
   void refreshAll(bindings);
   restartTimer(bindings);

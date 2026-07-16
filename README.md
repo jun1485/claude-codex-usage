@@ -30,10 +30,10 @@ Hover any item for a full breakdown:
 
 ## Data sources
 
-| Tool        | Source                                         | How                                                                                |
-| ----------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Claude Code | OAuth token from `~/.claude/.credentials.json` | Queries an Anthropic-hosted, undocumented usage endpoint (every 60s, configurable) |
-| Codex CLI   | Session logs in `~/.codex/sessions/**/*.jsonl` | Parses the latest `rate_limits` event (updates instantly via file watching)        |
+| Tool        | Source                                                                | How                                                                                                  |
+| ----------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Claude Code | OAuth token from `~/.claude/.credentials.json` or the macOS Keychain | Queries an Anthropic-hosted, undocumented usage endpoint (every 60s while the window is focused, configurable) |
+| Codex CLI   | Session logs in `~/.codex/sessions/**/*.jsonl`                        | Parses the latest `rate_limits` event (updates instantly via file watching)                          |
 
 Tokens and usage data stay on your machine. The extension has no telemetry or owned server; Claude usage requests go only to the Anthropic-hosted endpoint.
 
@@ -61,7 +61,9 @@ If the extension helps your workflow, an honest Marketplace review is welcome. R
 
 - If the Claude token has expired, running Claude Code once renews it automatically.
 - The Anthropic-hosted usage endpoint is undocumented and may change without notice.
-- Codex usage comes from session logs, so new data appears only when Codex runs (changes are picked up immediately).
+- Codex usage comes from session logs, so new data appears only when Codex runs (changes are picked up immediately). Windows whose reset time has already passed are shown as 0%.
+- A status bar item is hidden automatically when its tool is not detected (no `~/.claude` directory, or no `~/.codex/sessions` directory). It appears once the tool is used.
+- Refresh pauses while the window is unfocused and resumes (with an immediate refresh) on focus.
 
 ## Localization
 

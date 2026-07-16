@@ -8,6 +8,9 @@ import { UsageResult, UsageWindow } from './types';
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 const REQUEST_TIMEOUT_MS = 10_000;
 const RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000;
+const RATE_LIMIT_BACKOFF_MAX_MS = 60 * 60 * 1000;
+// macOS Keychain 자격증명 서비스명
+const KEYCHAIN_SERVICE = 'Claude Code-credentials';
 // User-Agent 누락 시 저한도 버킷으로 분류되어 429 발생
 const FALLBACK_CLI_VERSION = '2.1.207';
 let cliVersionPromise: Promise<string> | null = null;
@@ -100,6 +103,8 @@ interface ClaudeUsageResponse {
 // 429 수신 시 재시도 유예 시각
 let backoffUntil = 0;
 let lastResult: UsageResult | null = null;
+// 자격증명 경로별 캐시 구분 키
+let lastCacheKey = '';
 
 // 마지막 성공 데이터 지연 상태 표시
 function staleLastResult(): UsageResult | null {
@@ -118,6 +123,55 @@ function staleLastResult(): UsageResult | null {
 // Claude 인증 파일 기본 경로 결정
 function resolveCredentialsPath(customPath: string): string {
   return customPath || path.join(os.homedir(), '.claude', '.credentials.json');
+}
+
+// macOS Keychain 자격증명 조회
+function credentialsFromKeychain(): Promise<string | null> {
+  return new Promise((resolve) => {
+    exec(`security find-generic-password -s "${KEYCHAIN_SERVICE}" -w`, { timeout: 5000 }, (error, stdout) => {
+      resolve(error ? null : stdout.trim() || null);
+    });
+  });
+}
+
+// 자격증명 파일·Keychain 순차 조회
+async function readCredentials(customPath: string): Promise<ClaudeCredentials | null> {
+  try {
+    return JSON.parse(await fs.readFile(resolveCredentialsPath(customPath), 'utf8'));
+  } catch {
+    // 커스텀 경로 지정 시 Keychain 폴백 미적용
+    if (customPath || process.platform !== 'darwin') {
+      return null;
+    }
+  }
+  const keychainRaw = await credentialsFromKeychain();
+  if (!keychainRaw) {
+    return null;
+  }
+  try {
+    return JSON.parse(keychainRaw);
+  } catch {
+    return null;
+  }
+}
+
+// Claude Code 미설치 여부 판별
+async function isClaudeAbsent(): Promise<boolean> {
+  try {
+    await fs.access(path.join(os.homedir(), '.claude'));
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+// Retry-After 헤더 기반 429 유예 시간 결정
+function resolveBackoffMs(retryAfter: string | null): number {
+  const seconds = Number(retryAfter);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return RATE_LIMIT_BACKOFF_MS;
+  }
+  return Math.min(seconds * 1000, RATE_LIMIT_BACKOFF_MAX_MS);
 }
 
 // ISO 문자열 리셋 시각 변환
@@ -164,6 +218,14 @@ function toWindows(usage: ClaudeUsageResponse): UsageWindow[] {
 
 // Claude OAuth usage API 조회
 export async function fetchClaudeUsage(customCredentialsPath: string): Promise<UsageResult> {
+  // 자격증명 경로 변경 시 캐시·유예 초기화
+  const cacheKey = resolveCredentialsPath(customCredentialsPath);
+  if (cacheKey !== lastCacheKey) {
+    lastCacheKey = cacheKey;
+    lastResult = null;
+    backoffUntil = 0;
+  }
+
   // 429 유예 기간 추가 요청 차단
   if (Date.now() < backoffUntil) {
     return (
@@ -174,22 +236,35 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
     );
   }
 
-  let credentials: ClaudeCredentials;
-  try {
-    const raw = await fs.readFile(resolveCredentialsPath(customCredentialsPath), 'utf8');
-    credentials = JSON.parse(raw);
-  } catch {
+  const credentials = await readCredentials(customCredentialsPath);
+  if (!credentials) {
+    // 기본 경로에 흔적 자체가 없으면 미설치 처리
+    if (!customCredentialsPath && (await isClaudeAbsent())) {
+      return {
+        status: 'absent',
+        message: l10n.t('Not logged in to Claude (run claude, then /login)'),
+      };
+    }
     return {
       status: 'missing',
       message: l10n.t('Not logged in to Claude (run claude, then /login)'),
     };
   }
 
-  const token = credentials.claudeAiOauth?.accessToken;
+  const oauth = credentials.claudeAiOauth;
+  const token = oauth?.accessToken;
   if (!token) {
     return {
       status: 'missing',
       message: l10n.t('Claude OAuth token missing (run claude, then /login)'),
+    };
+  }
+
+  // 만료 토큰 사전 차단 (불필요한 401 요청 방지)
+  if (typeof oauth?.expiresAt === 'number' && Date.now() >= oauth.expiresAt) {
+    return {
+      status: 'error',
+      message: l10n.t('Claude token expired (renews automatically when Claude Code runs)'),
     };
   }
 
@@ -216,7 +291,7 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
     }
     if (response.status === 429) {
       // 과도 호출 방지 유예 후 마지막 데이터 유지
-      backoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS;
+      backoffUntil = Date.now() + resolveBackoffMs(response.headers.get('retry-after'));
       return (
         staleLastResult() ?? {
           status: 'error',
@@ -244,7 +319,7 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
       status: 'ok',
       data: {
         windows,
-        plan: credentials.claudeAiOauth?.subscriptionType ?? null,
+        plan: oauth?.subscriptionType ?? null,
         fetchedAt: new Date(),
         sourceNote: null,
       },
