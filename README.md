@@ -1,6 +1,8 @@
-# AI Usage Meter
+# Claude Code Usage & Codex Usage
 
-Shows Claude Code and Codex CLI rate-limit usage (5-hour / weekly windows) in the VS Code status bar.
+Monitor Claude Code and OpenAI Codex CLI usage limits side by side in VS Code, Cursor, Windsurf, and VSCodium, with 5-hour and weekly quotas, reset times, and alerts.
+
+[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor) · [Open VSX for Cursor and VSCodium](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor) · [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor) · [Leave an honest review](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor&ssr=false#review-details)
 
 ![Claude and Codex usage in the VS Code status bar](assets/screenshots/statusbar.png)
 
@@ -10,35 +12,45 @@ Hover any item for a full breakdown:
 
 ![Codex CLI usage details](assets/screenshots/codex-tooltip.png)
 
+## Install
+
+- VS Code: install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor)
+- Cursor and VSCodium: install from [Open VSX](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor)
+- Windsurf: install from the [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor) after the Open VSX listing is synchronized
+- Manual installation: download the VSIX from [GitHub Releases](https://github.com/jun1485/claude-codex-usage/releases/latest)
+
 ## What you see
 
-- Claude: `✳ 5h 7% (2d 5h)` — 5-hour window usage + time until the weekly reset
+- Claude: `✳ 5h 7% (3h 12m)` — 5-hour window usage + time until its reset
 - Codex: `⬡ 7d 12% (6d 1h)` — weekly window usage + time until reset
+- Full mode: `5h 7% (3h 12m) · 7d 41% (2d 5h)` — each usage window + its reset time
 - Hover for details: 5-hour / weekly / per-model usage bars, reset times, and plan
 - Background turns orange at 80% usage and red at 95% (thresholds configurable)
 - Click for a quick menu: toggle Claude/Codex on or off, open settings, or refresh
 
 ## Data sources
 
-| Tool | Source | How |
-|---|---|---|
-| Claude Code | OAuth token from `~/.claude/.credentials.json` | Queries the Anthropic usage API (every 60s, configurable) |
-| Codex CLI | Session logs in `~/.codex/sessions/**/*.jsonl` | Parses the latest `rate_limits` event (updates instantly via file watching) |
+| Tool        | Source                                         | How                                                                                |
+| ----------- | ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Claude Code | OAuth token from `~/.claude/.credentials.json` | Queries an Anthropic-hosted, undocumented usage endpoint (every 60s, configurable) |
+| Codex CLI   | Session logs in `~/.codex/sessions/**/*.jsonl` | Parses the latest `rate_limits` event (updates instantly via file watching)        |
 
-Tokens and usage data stay on your machine. Nothing is sent anywhere except the official Anthropic usage API.
+Tokens and usage data stay on your machine. The extension has no telemetry or owned server; Claude usage requests go only to the Anthropic-hosted endpoint.
+
+If the extension helps your workflow, an honest Marketplace review is welcome. Reviews are never rewarded or incentivized.
 
 ## Settings
 
-| Setting | Default | Description |
-|---|---|---|
-| `claudeCodexUsage.refreshIntervalSeconds` | `60` | Refresh interval in seconds |
-| `claudeCodexUsage.displayMode` | `compact` | `compact`: 5-hour usage only / `full`: all windows |
-| `claudeCodexUsage.warningThreshold` | `80` | Orange warning background threshold (%) |
-| `claudeCodexUsage.errorThreshold` | `95` | Red error background threshold (%) |
-| `claudeCodexUsage.claude.enabled` | `true` | Show Claude usage |
-| `claudeCodexUsage.codex.enabled` | `true` | Show Codex usage |
-| `claudeCodexUsage.claude.credentialsPath` | `""` | Override Claude credentials file path |
-| `claudeCodexUsage.codex.sessionsPath` | `""` | Override Codex sessions directory |
+| Setting                                   | Default   | Description                                        |
+| ----------------------------------------- | --------- | -------------------------------------------------- |
+| `claudeCodexUsage.refreshIntervalSeconds` | `60`      | Refresh interval in seconds                        |
+| `claudeCodexUsage.displayMode`            | `compact` | `compact`: 5-hour usage only / `full`: all windows |
+| `claudeCodexUsage.warningThreshold`       | `80`      | Orange warning background threshold (%)            |
+| `claudeCodexUsage.errorThreshold`         | `95`      | Red error background threshold (%)                 |
+| `claudeCodexUsage.claude.enabled`         | `true`    | Show Claude usage                                  |
+| `claudeCodexUsage.codex.enabled`          | `true`    | Show Codex usage                                   |
+| `claudeCodexUsage.claude.credentialsPath` | `""`      | Override Claude credentials file path              |
+| `claudeCodexUsage.codex.sessionsPath`     | `""`      | Override Codex sessions directory                  |
 
 ## Requirements
 
@@ -48,6 +60,7 @@ Tokens and usage data stay on your machine. Nothing is sent anywhere except the 
 ## Known limitations
 
 - If the Claude token has expired, running Claude Code once renews it automatically.
+- The Anthropic-hosted usage endpoint is undocumented and may change without notice.
 - Codex usage comes from session logs, so new data appears only when Codex runs (changes are picked up immediately).
 
 ## Localization

@@ -1,0 +1,35 @@
+name: Marketplace Metrics
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Metrics snapshot phase
+        required: true
+        default: weekly
+        type: choice
+        options:
+          - weekly
+          - after-deploy
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Collect Marketplace metrics
+        run: node scripts/marketplace-metrics.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          METRICS_PHASE: ${{ inputs.phase || 'weekly' }}

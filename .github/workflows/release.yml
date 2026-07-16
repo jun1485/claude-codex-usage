@@ -1,0 +1,40 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Package extension
+        run: npx vsce package --out extension.vsix
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish --packagePath extension.vsix --pat "$VSCE_PAT"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish to Open VSX
+        run: npx --yes ovsx publish extension.vsix -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      - name: Create GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" extension.vsix \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor), [Open VSX](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor), or [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor)."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
