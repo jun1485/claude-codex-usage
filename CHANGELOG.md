@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.2 — 2026-07-18
+
+- Japanese (日本語) localization for the marketplace listing and UI
+- Weekly metrics tracking expanded with rate limit, quota, and ccusage queries
+- Marketplace version, install, rating, and Open VSX badges added to the README
+
 ## 0.3.1 — 2026-07-18
 
 - Marketplace listing tuned for search: "Monitor" added to the display name, AI category added, low-value keywords replaced (ccusage, usage tracker, claude/codex limit, token usage)
