@@ -1,5 +1,10 @@
 # Claude Code Usage & Codex Usage Monitor
 
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/jjju.claude-codex-usage-monitor?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/jjju.claude-codex-usage-monitor)](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/jjju.claude-codex-usage-monitor)](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor&ssr=false#review-details)
+[![Open VSX](https://img.shields.io/open-vsx/v/jjju/claude-codex-usage-monitor?label=Open%20VSX)](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor)
+
 Claude usage & Codex usage monitor for your status bar — track Claude Code and OpenAI Codex CLI rate limits side by side in VS Code, Cursor, Windsurf, and VSCodium, with 5-hour and weekly quotas, reset times, and alerts.
 
 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor) · [Open VSX for Cursor and VSCodium](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor) · [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor) · [Leave an honest review](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor&ssr=false#review-details)
