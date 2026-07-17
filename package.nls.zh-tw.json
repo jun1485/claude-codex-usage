@@ -1,5 +1,5 @@
 {
-  "ext.description": "在 VS Code、Cursor、Windsurf 與 VSCodium 中並排監控 Claude Code 和 OpenAI Codex CLI 的 5 小時及每週用量限制、重設時間和警示",
+  "ext.description": "狀態列中的 Claude 用量與 Codex 用量監控。追蹤 Claude Code 和 OpenAI Codex CLI 的速率限制：5 小時及每週配額、重設時間和警示。支援 VS Code、Cursor、Windsurf 與 VSCodium",
   "cmd.refresh.title": "重新整理用量",
   "cmd.openSettings.title": "開啟設定",
   "cmd.openMenu.title": "開啟選單",
