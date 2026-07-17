@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.1 — 2026-07-18
+
+- Marketplace listing tuned for search: "Monitor" added to the display name, AI category added, low-value keywords replaced (ccusage, usage tracker, claude/codex limit, token usage)
+- Extension description rewritten so key search phrases (Claude usage, Codex usage monitor, rate limits) appear verbatim; Korean and Chinese translations updated
+- README title and introduction aligned with the listing
+
 ## 0.3.0 — 2026-07-16
 
 - Claude credentials fall back to the macOS Keychain when the credentials file is absent

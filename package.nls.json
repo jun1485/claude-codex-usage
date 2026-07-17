@@ -1,5 +1,5 @@
 {
-  "ext.description": "Monitor Claude Code and OpenAI Codex CLI usage limits side by side in VS Code, Cursor, Windsurf, and VSCodium, with 5-hour and weekly quotas, reset times, and alerts.",
+  "ext.description": "Claude usage & Codex usage monitor in your status bar. Track Claude Code and OpenAI Codex CLI rate limits: 5-hour and weekly quotas, reset times, and alerts. Works in VS Code, Cursor, Windsurf, and VSCodium.",
   "cmd.refresh.title": "Refresh Usage",
   "cmd.openSettings.title": "Open Settings",
   "cmd.openMenu.title": "Open Menu",

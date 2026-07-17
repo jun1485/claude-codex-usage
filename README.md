@@ -1,6 +1,6 @@
-# Claude Code Usage & Codex Usage
+# Claude Code Usage & Codex Usage Monitor
 
-Monitor Claude Code and OpenAI Codex CLI usage limits side by side in VS Code, Cursor, Windsurf, and VSCodium, with 5-hour and weekly quotas, reset times, and alerts.
+Claude usage & Codex usage monitor for your status bar — track Claude Code and OpenAI Codex CLI rate limits side by side in VS Code, Cursor, Windsurf, and VSCodium, with 5-hour and weekly quotas, reset times, and alerts.
 
 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor) · [Open VSX for Cursor and VSCodium](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor) · [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor) · [Leave an honest review](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor&ssr=false#review-details)
 

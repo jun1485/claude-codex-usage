@@ -1,5 +1,5 @@
 {
-  "ext.description": "VS Code, Cursor, Windsurf, VSCodium에서 Claude Code와 OpenAI Codex CLI의 5시간·주간 사용량 한도, 초기화 시간, 알림을 나란히 확인",
+  "ext.description": "상태 표시줄에서 확인하는 Claude 사용량·Codex 사용량 모니터. Claude Code와 OpenAI Codex CLI의 5시간·주간 한도, 초기화 시간, 알림을 VS Code, Cursor, Windsurf, VSCodium에서 나란히 확인",
   "cmd.refresh.title": "사용량 새로고침",
   "cmd.openSettings.title": "설정 열기",
   "cmd.openMenu.title": "메뉴 열기",
