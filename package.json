@@ -2,7 +2,7 @@
   "name": "claude-codex-usage-monitor",
   "displayName": "Claude Code Usage & Codex Usage Monitor",
   "description": "%ext.description%",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "jjju",
   "license": "MIT",
   "pricing": "Free",
