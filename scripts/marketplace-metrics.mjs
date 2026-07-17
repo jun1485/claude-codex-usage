@@ -12,6 +12,11 @@ const SEARCH_QUERIES = [
   "codex cli usage",
   "codex usage monitor",
   "claude codex usage",
+  "claude rate limit",
+  "codex rate limit",
+  "claude quota",
+  "codex quota",
+  "ccusage",
 ];
 
 // Marketplace 확장 검색 결과 조회
