@@ -1,0 +1,16 @@
+{
+  "ext.description": "ステータスバーで確認する Claude 使用量・Codex 使用量モニター。Claude Code と OpenAI Codex CLI のレート制限（5時間・週間クォータ、リセット時刻、アラート）を VS Code、Cursor、Windsurf、VSCodium で並べて確認",
+  "cmd.refresh.title": "使用量を更新",
+  "cmd.openSettings.title": "設定を開く",
+  "cmd.openMenu.title": "メニューを開く",
+  "cfg.refreshInterval": "更新間隔（秒）",
+  "cfg.displayMode": "ステータスバーの表示形式",
+  "cfg.displayMode.compact": "5時間ウィンドウの使用量とリセットまでの時間を表示（例: 5h 7% (3h 12m)）",
+  "cfg.displayMode.full": "各ウィンドウをリセット時間付きで表示（例: 5h 7% (3h 12m) · 7d 41% (2d 5h)）",
+  "cfg.warningThreshold": "この使用率（%）以上でオレンジの警告背景を表示",
+  "cfg.errorThreshold": "この使用率（%）以上で赤のエラー背景を表示",
+  "cfg.claude.enabled": "Claude Code の使用量を表示",
+  "cfg.claude.credentialsPath": "Claude 認証情報ファイルのパス（空 = ~/.claude/.credentials.json）",
+  "cfg.codex.enabled": "Codex CLI の使用量を表示",
+  "cfg.codex.sessionsPath": "Codex セッションログのディレクトリ（空 = ~/.codex/sessions）"
+}
