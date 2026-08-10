@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.3 — 2026-08-10
+
+- Codex usage now recovers after account switches that create consecutive empty rate-limit logs
+- Latest usage and reset times now follow each session event timestamp instead of file modification time
+- Regression coverage added for account-switch log bursts and long-running sessions
+
 ## 0.3.2 — 2026-07-18
 
 - Japanese (日本語) localization for the marketplace listing and UI
