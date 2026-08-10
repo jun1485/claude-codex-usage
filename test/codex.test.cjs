@@ -49,6 +49,19 @@ async function writeLogFile(dir, name, rateLimits, mtime) {
   return file;
 }
 
+// 이벤트 시각이 포함된 rate_limits 로그 파일 기록
+async function writeTimestampedLogFile(dir, name, rateLimits, recordedAt, mtime) {
+  await fsp.mkdir(dir, { recursive: true });
+  const file = path.join(dir, name);
+  const line = JSON.stringify({
+    timestamp: recordedAt.toISOString(),
+    payload: { type: 'token_count', rate_limits: rateLimits },
+  });
+  await fsp.writeFile(file, `${line}\n`, 'utf8');
+  await fsp.utimes(file, mtime, mtime);
+  return file;
+}
+
 // 최신 로그 우선 조회 검증
 test('가장 최근 세션 로그의 rate_limits를 사용한다', async () => {
   const root = await createTempDir();
@@ -144,6 +157,67 @@ test('기본 세션 경로가 없으면 absent, 커스텀 경로가 없으면 mi
     assert.equal(missing.status, 'missing');
   } finally {
     homeDir = '';
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+// 빈 사용량 로그가 몰린 계정 전환 직후 복구 검증
+test('최신 로그가 비어 있어도 최근 유효 사용량을 탐색한다', async () => {
+  const root = await createTempDir();
+  try {
+    const valid = await writeLogFile(
+      path.join(root, '2026', '08', '10'),
+      'rollout-2026-08-10T16-00-00-valid.jsonl',
+      { primary: { used_percent: 37, window_minutes: 300, resets_in_seconds: 3600 } },
+      new Date(Date.now() - 60 * 1000),
+    );
+    for (let index = 0; index < 12; index += 1) {
+      await writeLogFile(
+        path.join(root, '2026', '08', '10'),
+        `rollout-2026-08-10T17-00-${String(index).padStart(2, '0')}-empty.jsonl`,
+        null,
+        new Date(Date.now() + index),
+      );
+    }
+
+    const result = await fetchCodexUsage(root);
+
+    assert.equal(result.status, 'ok');
+    assert.equal(result.data.windows[0].percent, 37);
+    assert.equal(result.data.fetchedAt.getTime(), (await fsp.stat(valid)).mtime.getTime());
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+// 파일 수정 시각과 무관한 최신 이벤트 선택 검증
+test('파일 수정 시각 대신 최신 rate_limits 이벤트 시각을 사용한다', async () => {
+  const root = await createTempDir();
+  try {
+    const now = Date.now();
+    const latestEventAt = new Date(now - 30 * 1000);
+    await writeTimestampedLogFile(
+      path.join(root, '2026', '08', '10'),
+      'rollout-2026-08-10T16-00-00-active.jsonl',
+      { primary: { used_percent: 42, window_minutes: 300, resets_in_seconds: 3600 } },
+      latestEventAt,
+      new Date(now - 2 * 60 * 60 * 1000),
+    );
+    await writeTimestampedLogFile(
+      path.join(root, '2026', '08', '10'),
+      'rollout-2026-08-10T17-00-00-touched.jsonl',
+      { primary: { used_percent: 81, window_minutes: 300, resets_in_seconds: 3600 } },
+      new Date(now - 60 * 60 * 1000),
+      new Date(now),
+    );
+
+    const result = await fetchCodexUsage(root);
+
+    assert.equal(result.status, 'ok');
+    assert.equal(result.data.windows[0].percent, 42);
+    assert.equal(result.data.fetchedAt.getTime(), latestEventAt.getTime());
+    assert.equal(result.data.windows[0].resetsAt.getTime(), latestEventAt.getTime() + 3600 * 1000);
+  } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

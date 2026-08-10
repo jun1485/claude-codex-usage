@@ -5,7 +5,6 @@ import { l10n } from 'vscode';
 import { UsageResult, UsageWindow, WindowKind } from './types';
 
 // 세션 로그 탐색 상한
-const MAX_FILES_TO_SCAN = 8;
 const MAX_FILES_TO_COLLECT = 24;
 const TAIL_READ_BYTES = 256 * 1024;
 // 세션 구간 판별 상한 (분)
@@ -25,11 +24,17 @@ interface CodexRateLimits {
 }
 
 interface CodexLogLine {
+  timestamp?: string | null;
   payload?: {
     type?: string;
     rate_limits?: CodexRateLimits | null;
   } | null;
   rate_limits?: CodexRateLimits | null;
+}
+
+interface CodexRateLimitRecord {
+  rateLimits: CodexRateLimits;
+  recordedAt: Date;
 }
 
 // Codex 세션 디렉터리 기본 경로 결정
@@ -61,7 +66,7 @@ async function collectRecentJsonlFiles(dir: string, out: string[], limit: number
 }
 
 // 파일 끝부분만 부분 읽기
-async function readTail(file: string, maxBytes: number): Promise<string> {
+async function readTail(file: string, maxBytes: number): Promise<{ text: string; mtime: Date }> {
   const stat = await fs.stat(file);
   const start = Math.max(0, stat.size - maxBytes);
   const handle = await fs.open(file, 'r');
@@ -69,17 +74,25 @@ async function readTail(file: string, maxBytes: number): Promise<string> {
     const length = stat.size - start;
     const buffer = Buffer.alloc(length);
     await handle.read(buffer, 0, length, start);
-    return buffer.toString('utf8');
+    return { text: buffer.toString('utf8'), mtime: stat.mtime };
   } finally {
     await handle.close();
   }
 }
 
-// 로그 라인에서 rate_limits 추출
-function extractRateLimits(line: string): CodexRateLimits | null {
+// 로그 라인의 사용량 제한 기록 추출
+function extractRateLimitRecord(line: string, fallbackRecordedAt: Date): CodexRateLimitRecord | null {
   try {
     const parsed: CodexLogLine = JSON.parse(line);
-    return parsed.payload?.rate_limits ?? parsed.rate_limits ?? null;
+    const rateLimits = parsed.payload?.rate_limits ?? parsed.rate_limits ?? null;
+    if (!rateLimits) {
+      return null;
+    }
+    const recordedAt = typeof parsed.timestamp === 'string' ? new Date(parsed.timestamp) : fallbackRecordedAt;
+    return {
+      rateLimits,
+      recordedAt: Number.isNaN(recordedAt.getTime()) ? fallbackRecordedAt : recordedAt,
+    };
   } catch {
     return null;
   }
@@ -144,54 +157,54 @@ export async function fetchCodexUsage(customSessionsPath: string): Promise<Usage
     return { status: 'missing', message: l10n.t('No Codex session logs (run codex to populate)') };
   }
 
-  const withMtime = await Promise.all(
-    files.map(async (file) => {
-      try {
-        const stat = await fs.stat(file);
-        return { file, mtime: stat.mtime };
-      } catch {
-        return { file, mtime: new Date(0) };
-      }
-    }),
-  );
-  withMtime.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-  for (const { file, mtime } of withMtime.slice(0, MAX_FILES_TO_SCAN)) {
-    let tail: string;
+  let latestUsage: { windows: UsageWindow[]; plan: string | null; recordedAt: Date } | null = null;
+  for (const file of files) {
+    let tail: { text: string; mtime: Date };
     try {
       tail = await readTail(file, TAIL_READ_BYTES);
     } catch {
       continue;
     }
-    const lines = tail.split('\n');
+    const lines = tail.text.split('\n');
     for (let i = lines.length - 1; i >= 0; i -= 1) {
       const line = lines[i];
       if (!line.includes('"rate_limits"')) {
         continue;
       }
-      const rateLimits = extractRateLimits(line);
-      if (!rateLimits) {
+      const record = extractRateLimitRecord(line, tail.mtime);
+      if (!record) {
         continue;
       }
       const windows = [
-        toUsageWindow(rateLimits.primary, 'session', mtime),
-        toUsageWindow(rateLimits.secondary, 'weekly', mtime),
+        toUsageWindow(record.rateLimits.primary, 'session', record.recordedAt),
+        toUsageWindow(record.rateLimits.secondary, 'weekly', record.recordedAt),
       ]
         .filter((w): w is UsageWindow => w !== null)
         .sort((a, b) => (a.kind === 'session' ? 0 : 1) - (b.kind === 'session' ? 0 : 1));
       if (windows.length === 0) {
         continue;
       }
-      return {
-        status: 'ok',
-        data: {
+      if (!latestUsage || record.recordedAt.getTime() > latestUsage.recordedAt.getTime()) {
+        latestUsage = {
           windows,
-          plan: rateLimits.plan_type ?? null,
-          fetchedAt: mtime,
-          sourceNote: l10n.t('Updates from session logs when Codex runs'),
-        },
-      };
+          plan: record.rateLimits.plan_type ?? null,
+          recordedAt: record.recordedAt,
+        };
+      }
+      break;
     }
+  }
+
+  if (latestUsage) {
+    return {
+      status: 'ok',
+      data: {
+        windows: latestUsage.windows,
+        plan: latestUsage.plan,
+        fetchedAt: latestUsage.recordedAt,
+        sourceNote: l10n.t('Updates from session logs when Codex runs'),
+      },
+    };
   }
 
   return { status: 'missing', message: l10n.t('No usage records in session logs (run codex to refresh)') };
