@@ -23,6 +23,7 @@ interface ExtensionConfig {
   claudeEnabled: boolean;
   codexEnabled: boolean;
   claudeCredentialsPath: string;
+  claudeAccountLabel: string;
   codexSessionsPath: string;
 }
 
@@ -51,6 +52,7 @@ function getConfig(): ExtensionConfig {
     claudeEnabled: cfg.get<boolean>('claude.enabled', true),
     codexEnabled: cfg.get<boolean>('codex.enabled', true),
     claudeCredentialsPath: cfg.get<string>('claude.credentialsPath', ''),
+    claudeAccountLabel: cfg.get<string>('claude.accountLabel', '').trim(),
     codexSessionsPath: cfg.get<string>('codex.sessionsPath', ''),
   };
 }
@@ -112,7 +114,11 @@ async function refreshAll(bindings: ProviderBinding[]): Promise<void> {
         binding.item.hide();
         return;
       }
-      render(binding, result, latestConfig);
+      const displayResult =
+        binding.id === 'claude' && result.status === 'ok' && latestConfig.claudeAccountLabel
+          ? { ...result, data: { ...result.data, account: latestConfig.claudeAccountLabel } }
+          : result;
+      render(binding, displayResult, latestConfig);
     }),
   );
 }

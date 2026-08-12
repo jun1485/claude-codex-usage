@@ -127,6 +127,9 @@ export function buildTooltip(
 ): vscode.MarkdownString {
   const planSuffix = data.plan ? ` · ${vscode.l10n.t('Plan')} ${data.plan}` : '';
   const lines: string[] = [`$(${icon}) **${title}**${planSuffix}`];
+  if (data.account) {
+    lines.push(`${vscode.l10n.t('Current account')}: **${data.account}**`);
+  }
   for (const window of data.windows) {
     lines.push(
       `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}**${formatResetDetail(window.resetsAt)}`,
