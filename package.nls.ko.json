@@ -11,6 +11,7 @@
   "cfg.errorThreshold": "이 사용률(%) 이상이면 빨간색 위험 배경 표시",
   "cfg.claude.enabled": "Claude Code 사용량 표시",
   "cfg.claude.credentialsPath": "Claude 인증 파일 경로 (비워두면 ~/.claude/.credentials.json)",
+  "cfg.claude.accountLabel": "툴팁에 표시할 Claude 계정 라벨 (자동 이메일 감지보다 우선)",
   "cfg.codex.enabled": "Codex CLI 사용량 표시",
   "cfg.codex.sessionsPath": "Codex 세션 로그 디렉터리 (비워두면 ~/.codex/sessions)"
 }

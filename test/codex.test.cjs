@@ -62,6 +62,16 @@ async function writeTimestampedLogFile(dir, name, rateLimits, recordedAt, mtime)
   return file;
 }
 
+// Codex 현재 계정 인증 정보 기록
+async function writeAuthFile(sessionsDir, email, accountId) {
+  const encodedPayload = Buffer.from(JSON.stringify({ email })).toString('base64url');
+  await fsp.writeFile(
+    path.join(path.dirname(sessionsDir), 'auth.json'),
+    JSON.stringify({ tokens: { id_token: `header.${encodedPayload}.signature`, account_id: accountId } }),
+    'utf8',
+  );
+}
+
 // 최신 로그 우선 조회 검증
 test('가장 최근 세션 로그의 rate_limits를 사용한다', async () => {
   const root = await createTempDir();
@@ -139,6 +149,35 @@ test('window_minutes가 없으면 primary는 세션 구간으로 분류한다', 
     assert.equal(result.data.windows[0].kind, 'session');
     assert.equal(result.data.windows[0].label, '5h');
     assert.equal(result.data.windows[0].resetsAt.getTime(), resetsAt * 1000);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+// 현재 Codex 계정 식별 정보 조회 검증
+test('Codex 인증 정보에서 이메일을 우선하고 계정 ID를 대체 사용한다', async () => {
+  const root = await createTempDir();
+  const sessionsDir = path.join(root, 'sessions');
+  try {
+    await writeLogFile(path.join(sessionsDir, '2026', '08', '12'), 'rollout-account.jsonl', {
+      primary: { used_percent: 25, window_minutes: 300, resets_in_seconds: 3600 },
+    });
+    await writeAuthFile(sessionsDir, 'current@example.com', 'account-id');
+
+    const emailResult = await fetchCodexUsage(sessionsDir);
+
+    assert.equal(emailResult.status, 'ok');
+    assert.equal(emailResult.data.account, 'current@example.com');
+
+    await fsp.writeFile(
+      path.join(root, 'auth.json'),
+      JSON.stringify({ tokens: { id_token: 'invalid-token', account_id: 'account-id' } }),
+      'utf8',
+    );
+    const accountIdResult = await fetchCodexUsage(sessionsDir);
+
+    assert.equal(accountIdResult.status, 'ok');
+    assert.equal(accountIdResult.data.account, 'account-id');
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

@@ -2,7 +2,7 @@
   "name": "claude-codex-usage-monitor",
   "displayName": "Claude Code Usage & Codex Usage Monitor",
   "description": "%ext.description%",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "jjju",
   "license": "MIT",
   "pricing": "Free",
@@ -154,16 +154,22 @@
           "order": 6,
           "description": "%cfg.claude.credentialsPath%"
         },
+        "claudeCodexUsage.claude.accountLabel": {
+          "type": "string",
+          "default": "",
+          "order": 7,
+          "description": "%cfg.claude.accountLabel%"
+        },
         "claudeCodexUsage.codex.enabled": {
           "type": "boolean",
           "default": true,
-          "order": 7,
+          "order": 8,
           "description": "%cfg.codex.enabled%"
         },
         "claudeCodexUsage.codex.sessionsPath": {
           "type": "string",
           "default": "",
-          "order": 8,
+          "order": 9,
           "description": "%cfg.codex.sessionsPath%"
         }
       }
