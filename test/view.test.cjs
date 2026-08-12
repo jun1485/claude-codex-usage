@@ -12,12 +12,20 @@ function translate(message, ...args) {
 // VS Code 런타임 모듈 대체
 Module._load = function load(request, parent, isMain) {
   if (request === 'vscode') {
-    return { env: { language: 'en' }, l10n: { t: translate } };
+    return {
+      env: { language: 'en' },
+      l10n: { t: translate },
+      MarkdownString: class MarkdownString {
+        constructor(value) {
+          this.value = value;
+        }
+      },
+    };
   }
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { buildStatusText, pickSeverity } = require('../out/view');
+const { buildStatusText, buildTooltip, pickSeverity } = require('../out/view');
 
 // 사용량 테스트 스냅샷 생성
 function createSnapshot(now) {
@@ -37,6 +45,7 @@ function createSnapshot(now) {
       },
     ],
     plan: 'max',
+    account: 'user@example.com',
     fetchedAt: new Date(now),
     sourceNote: null,
   };
@@ -71,11 +80,19 @@ test('full 모드는 각 사용량 구간의 초기화 시간을 표시한다', 
   }
 });
 
+// 현재 계정 툴팁 표시 검증
+test('툴팁에 현재 계정 이메일을 표시한다', () => {
+  const tooltip = buildTooltip('codex-usage-logo', 'Codex CLI Usage', createSnapshot(Date.now()), 80, 95);
+
+  assert.match(tooltip.value, /Current account: \*\*user@example\.com\*\*/);
+});
+
 // 표시값·경고 단계 반올림 일치 검증
 test('경고 단계는 표시와 같은 반올림 값 기준으로 판정한다', () => {
   const data = {
     windows: [{ kind: 'session', label: '5h', percent: 94.6, resetsAt: null }],
     plan: null,
+    account: null,
     fetchedAt: new Date(),
     sourceNote: null,
   };

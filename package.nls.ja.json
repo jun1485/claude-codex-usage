@@ -11,6 +11,7 @@
   "cfg.errorThreshold": "この使用率（%）以上で赤のエラー背景を表示",
   "cfg.claude.enabled": "Claude Code の使用量を表示",
   "cfg.claude.credentialsPath": "Claude 認証情報ファイルのパス（空 = ~/.claude/.credentials.json）",
+  "cfg.claude.accountLabel": "ツールチップに表示する Claude アカウントラベル（自動メール検出より優先）",
   "cfg.codex.enabled": "Codex CLI の使用量を表示",
   "cfg.codex.sessionsPath": "Codex セッションログのディレクトリ（空 = ~/.codex/sessions）"
 }

@@ -82,6 +82,12 @@ interface ClaudeCredentials {
   };
 }
 
+interface ClaudeProfile {
+  oauthAccount?: {
+    emailAddress?: string;
+  };
+}
+
 interface ClaudeWindowInfo {
   utilization?: number | null;
   resets_at?: string | null;
@@ -123,6 +129,19 @@ function staleLastResult(): UsageResult | null {
 // Claude 인증 파일 기본 경로 결정
 function resolveCredentialsPath(customPath: string): string {
   return customPath || path.join(os.homedir(), '.claude', '.credentials.json');
+}
+
+// 현재 Claude 계정 이메일 조회
+async function readClaudeAccount(customCredentialsPath: string): Promise<string | null> {
+  if (customCredentialsPath) {
+    return null;
+  }
+  try {
+    const profile: ClaudeProfile = JSON.parse(await fs.readFile(path.join(os.homedir(), '.claude.json'), 'utf8'));
+    return profile.oauthAccount?.emailAddress ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // macOS Keychain 자격증명 조회
@@ -219,7 +238,8 @@ function toWindows(usage: ClaudeUsageResponse): UsageWindow[] {
 // Claude OAuth usage API 조회
 export async function fetchClaudeUsage(customCredentialsPath: string): Promise<UsageResult> {
   // 자격증명 경로 변경 시 캐시·유예 초기화
-  const cacheKey = resolveCredentialsPath(customCredentialsPath);
+  const account = await readClaudeAccount(customCredentialsPath);
+  const cacheKey = `${resolveCredentialsPath(customCredentialsPath)}:${account ?? ''}`;
   if (cacheKey !== lastCacheKey) {
     lastCacheKey = cacheKey;
     lastResult = null;
@@ -320,6 +340,7 @@ export async function fetchClaudeUsage(customCredentialsPath: string): Promise<U
       data: {
         windows,
         plan: oauth?.subscriptionType ?? null,
+        account,
         fetchedAt: new Date(),
         sourceNote: null,
       },

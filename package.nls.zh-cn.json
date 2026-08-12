@@ -11,6 +11,7 @@
   "cfg.errorThreshold": "用量达到该百分比(%)及以上时显示红色警报背景",
   "cfg.claude.enabled": "显示 Claude Code 用量",
   "cfg.claude.credentialsPath": "Claude 凭据文件路径（留空 = ~/.claude/.credentials.json）",
+  "cfg.claude.accountLabel": "工具提示中显示的 Claude 账户标签（优先于自动电子邮件检测）",
   "cfg.codex.enabled": "显示 Codex CLI 用量",
   "cfg.codex.sessionsPath": "Codex 会话日志目录（留空 = ~/.codex/sessions）"
 }

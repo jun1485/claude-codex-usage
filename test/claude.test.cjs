@@ -6,6 +6,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const originalFetch = global.fetch;
 const originalLoad = Module._load;
 const claudePath = require.resolve('../out/claude');
+let claudeAccountEmail = 'claude@example.com';
 
 // VS Code 런타임 번역 대체
 function translate(message, ...args) {
@@ -24,10 +25,12 @@ Module._load = function load(request, parent, isMain) {
   }
   if (request === 'fs/promises') {
     return {
-      readFile: async () =>
-        JSON.stringify({
-          claudeAiOauth: { accessToken: 'test-token', subscriptionType: 'max' },
-        }),
+      readFile: async (file) =>
+        JSON.stringify(
+          String(file).endsWith('.claude.json')
+            ? { oauthAccount: { emailAddress: claudeAccountEmail } }
+            : { claudeAiOauth: { accessToken: 'test-token', subscriptionType: 'max' } },
+        ),
     };
   }
   return originalLoad.call(this, request, parent, isMain);
@@ -143,4 +146,21 @@ test('AbortError는 요청 시간 초과 오류로 표시한다', async () => {
     status: 'error',
     message: 'Usage API request timed out',
   });
+});
+
+// 현재 Claude 계정 이메일 조회 검증
+test('기본 자격증명 사용 시 현재 Claude 계정 이메일을 반환한다', async () => {
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    headers: new Map(),
+    text: async () => JSON.stringify({ five_hour: { utilization: 12 } }),
+  });
+  claudeAccountEmail = 'current-claude@example.com';
+  const { fetchClaudeUsage } = loadClaude();
+
+  const result = await fetchClaudeUsage('');
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.data.account, 'current-claude@example.com');
 });

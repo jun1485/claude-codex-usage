@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.4 — 2026-08-12
+
+- Codex and Claude tooltips now show the currently active account for easier multi-account identification
+- Claude automatically reads the active email from the local profile and supports a custom account label override
+- Account switches now isolate cached Claude usage data, with fallback coverage for Codex account identifiers
+
 ## 0.3.3 — 2026-08-10
 
 - Codex usage now recovers after account switches that create consecutive empty rate-limit logs

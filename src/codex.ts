@@ -37,9 +37,41 @@ interface CodexRateLimitRecord {
   recordedAt: Date;
 }
 
+interface CodexAuthData {
+  tokens?: {
+    id_token?: string;
+    account_id?: string;
+  };
+}
+
+interface CodexIdTokenPayload {
+  email?: string;
+}
+
 // Codex 세션 디렉터리 기본 경로 결정
 export function resolveSessionsPath(customPath: string): string {
   return customPath || path.join(os.homedir(), '.codex', 'sessions');
+}
+
+// 현재 Codex 계정 식별 정보 조회
+async function readCodexAccount(sessionsDir: string): Promise<string | null> {
+  let auth: CodexAuthData;
+  try {
+    auth = JSON.parse(await fs.readFile(path.join(path.dirname(sessionsDir), 'auth.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+
+  const encodedPayload = auth.tokens?.id_token?.split('.')[1];
+  if (encodedPayload) {
+    try {
+      const payload: CodexIdTokenPayload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+      if (payload.email) {
+        return payload.email;
+      }
+    } catch {}
+  }
+  return auth.tokens?.account_id ?? null;
 }
 
 // 이름 역순 우선 순회로 최신 jsonl 파일 수집
@@ -201,6 +233,7 @@ export async function fetchCodexUsage(customSessionsPath: string): Promise<Usage
       data: {
         windows: latestUsage.windows,
         plan: latestUsage.plan,
+        account: await readCodexAccount(sessionsDir),
         fetchedAt: latestUsage.recordedAt,
         sourceNote: l10n.t('Updates from session logs when Codex runs'),
       },
