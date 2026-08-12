@@ -13,6 +13,7 @@ export interface UsageWindow {
 export interface UsageSnapshot {
   windows: UsageWindow[];
   plan: string | null;
+  account: string | null;
   fetchedAt: Date;
   sourceNote: string | null;
 }
