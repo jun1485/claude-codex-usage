@@ -38,7 +38,7 @@ function pickPrimaryWindow(windows: UsageWindow[]): UsageWindow | null {
 // 사용량 구간 상태 문구 구성
 function formatWindowStatus(window: UsageWindow): string {
   const remaining = formatRemaining(window.resetsAt);
-  return `${window.label} ${formatPercent(window.percent)}${remaining ? ` (${remaining})` : ''}`;
+  return `${window.label} ${vscode.l10n.t('{0} used', formatPercent(window.percent))}${remaining ? ` (${remaining})` : ''}`;
 }
 
 // 상태바 본문 텍스트 구성
@@ -47,13 +47,10 @@ export function buildStatusText(data: UsageSnapshot, mode: DisplayMode): string 
   if (!primary) {
     return '--';
   }
-  if (mode === 'full') {
-    return data.windows
-      .filter((w) => w.kind !== 'scoped')
-      .map(formatWindowStatus)
-      .join(' · ');
-  }
-  return formatWindowStatus(primary);
+  const main = data.windows.filter((w) => w.kind !== 'scoped');
+  const visible = mode === 'full' && main.length ? main : [primary];
+  const value = visible.map(formatWindowStatus).join(' · ');
+  return data.historical ? `$(history) ${value}` : value;
 }
 
 // 사용률 최고치 기준 경고 단계 판정 (표시 반올림 값 기준)
@@ -70,13 +67,13 @@ export function pickSeverity(data: UsageSnapshot, warningThreshold: number, erro
 
 // 구간 명칭 변환
 function windowDisplayName(window: UsageWindow): string {
-  if (window.kind === 'session') {
-    return vscode.l10n.t('5-hour');
+  if (window.kind === 'session' && window.label === '5h') {
+    return vscode.l10n.t('5-hour used');
   }
-  if (window.kind === 'weekly') {
-    return vscode.l10n.t('Weekly');
+  if (window.kind === 'weekly' && window.label === '7d') {
+    return vscode.l10n.t('Weekly used');
   }
-  return window.label;
+  return vscode.l10n.t('{0} used', window.label);
 }
 
 // 표시 언어 기준 일시 표기
@@ -132,7 +129,7 @@ export function buildTooltip(
   }
   for (const window of data.windows) {
     lines.push(
-      `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}**${formatResetDetail(window.resetsAt)}`,
+      `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}** (${vscode.l10n.t('{0} remaining', formatPercent(Math.max(0, 100 - Math.round(window.percent))))})${formatResetDetail(window.resetsAt)}`,
     );
   }
   const sourceSuffix = data.sourceNote ? ` · ${data.sourceNote}` : '';

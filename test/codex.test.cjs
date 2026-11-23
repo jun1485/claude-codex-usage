@@ -25,7 +25,7 @@ Module._load = function load(request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { fetchCodexUsage } = require('../out/codex');
+const { fetchCodexUsageFromLogs } = require('../out/codex');
 
 // 테스트 런타임 전역 복원
 test.after(() => {
@@ -94,7 +94,7 @@ test('가장 최근 세션 로그의 rate_limits를 사용한다', async () => {
       new Date(now - 60 * 1000),
     );
 
-    const result = await fetchCodexUsage(root);
+    const result = await fetchCodexUsageFromLogs(root);
 
     assert.equal(result.status, 'ok');
     assert.equal(result.data.plan, 'plus');
@@ -114,7 +114,7 @@ test('가장 최근 세션 로그의 rate_limits를 사용한다', async () => {
 });
 
 // 리셋 경과 데이터 만료 처리 검증
-test('리셋 시각이 지난 구간은 0%로 만료 처리한다', async () => {
+test('리셋 뒤 관측값이 없으면 사용량을 추정하지 않는다', async () => {
   const root = await createTempDir();
   try {
     await writeLogFile(
@@ -124,11 +124,9 @@ test('리셋 시각이 지난 구간은 0%로 만료 처리한다', async () => 
       new Date(Date.now() - 2 * 60 * 60 * 1000),
     );
 
-    const result = await fetchCodexUsage(root);
+    const result = await fetchCodexUsageFromLogs(root);
 
-    assert.equal(result.status, 'ok');
-    assert.equal(result.data.windows[0].percent, 0);
-    assert.equal(result.data.windows[0].resetsAt, null);
+    assert.equal(result.status, 'missing');
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -143,7 +141,7 @@ test('window_minutes가 없으면 primary는 세션 구간으로 분류한다', 
       primary: { used_percent: 33, resets_at: resetsAt },
     });
 
-    const result = await fetchCodexUsage(root);
+    const result = await fetchCodexUsageFromLogs(root);
 
     assert.equal(result.status, 'ok');
     assert.equal(result.data.windows[0].kind, 'session');
@@ -155,7 +153,7 @@ test('window_minutes가 없으면 primary는 세션 구간으로 분류한다', 
 });
 
 // 현재 Codex 계정 식별 정보 조회 검증
-test('Codex 인증 정보에서 이메일을 우선하고 계정 ID를 대체 사용한다', async () => {
+test('과거 로그에 현재 인증 계정을 붙이지 않는다', async () => {
   const root = await createTempDir();
   const sessionsDir = path.join(root, 'sessions');
   try {
@@ -164,20 +162,20 @@ test('Codex 인증 정보에서 이메일을 우선하고 계정 ID를 대체 �
     });
     await writeAuthFile(sessionsDir, 'current@example.com', 'account-id');
 
-    const emailResult = await fetchCodexUsage(sessionsDir);
+    const emailResult = await fetchCodexUsageFromLogs(sessionsDir);
 
     assert.equal(emailResult.status, 'ok');
-    assert.equal(emailResult.data.account, 'current@example.com');
+    assert.equal(emailResult.data.account, null);
 
     await fsp.writeFile(
       path.join(root, 'auth.json'),
       JSON.stringify({ tokens: { id_token: 'invalid-token', account_id: 'account-id' } }),
       'utf8',
     );
-    const accountIdResult = await fetchCodexUsage(sessionsDir);
+    const accountIdResult = await fetchCodexUsageFromLogs(sessionsDir);
 
     assert.equal(accountIdResult.status, 'ok');
-    assert.equal(accountIdResult.data.account, 'account-id');
+    assert.equal(accountIdResult.data.account, null);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -189,10 +187,10 @@ test('기본 세션 경로가 없으면 absent, 커스텀 경로가 없으면 mi
   try {
     homeDir = root;
 
-    const absent = await fetchCodexUsage('');
+    const absent = await fetchCodexUsageFromLogs('');
     assert.equal(absent.status, 'absent');
 
-    const missing = await fetchCodexUsage(path.join(root, 'no-such-dir'));
+    const missing = await fetchCodexUsageFromLogs(path.join(root, 'no-such-dir'));
     assert.equal(missing.status, 'missing');
   } finally {
     homeDir = '';
@@ -210,7 +208,7 @@ test('최신 로그가 비어 있어도 최근 유효 사용량을 탐색한다'
       { primary: { used_percent: 37, window_minutes: 300, resets_in_seconds: 3600 } },
       new Date(Date.now() - 60 * 1000),
     );
-    for (let index = 0; index < 12; index += 1) {
+    for (let index = 0; index < 30; index += 1) {
       await writeLogFile(
         path.join(root, '2026', '08', '10'),
         `rollout-2026-08-10T17-00-${String(index).padStart(2, '0')}-empty.jsonl`,
@@ -219,7 +217,7 @@ test('최신 로그가 비어 있어도 최근 유효 사용량을 탐색한다'
       );
     }
 
-    const result = await fetchCodexUsage(root);
+    const result = await fetchCodexUsageFromLogs(root);
 
     assert.equal(result.status, 'ok');
     assert.equal(result.data.windows[0].percent, 37);
@@ -250,12 +248,38 @@ test('파일 수정 시각 대신 최신 rate_limits 이벤트 시각을 사용�
       new Date(now),
     );
 
-    const result = await fetchCodexUsage(root);
+    const result = await fetchCodexUsageFromLogs(root);
 
     assert.equal(result.status, 'ok');
     assert.equal(result.data.windows[0].percent, 42);
     assert.equal(result.data.fetchedAt.getTime(), latestEventAt.getTime());
     assert.equal(result.data.windows[0].resetsAt.getTime(), latestEventAt.getTime() + 3600 * 1000);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+// 장기 세션과 별도 한도 기록 구분 검증
+test('긴 출력 뒤에도 일반 Codex 한도의 최근 기록을 찾는다', async () => {
+  const root = await createTempDir();
+  try {
+    const file = await writeLogFile(root, 'active.jsonl', {
+      limit_id: 'codex',
+      primary: { used_percent: 42, window_minutes: 15 },
+    });
+    await fsp.appendFile(
+      file,
+      JSON.stringify({ text: 'x'.repeat(300000) }) +
+        '\n' +
+        JSON.stringify({
+          payload: { rate_limits: { limit_id: 'other', primary: { used_percent: 99 } } },
+        }) +
+        '\n',
+    );
+    const result = await fetchCodexUsageFromLogs(root);
+    assert.equal(result.data.windows[0].label, '15m');
+    assert.equal(result.data.windows[0].percent, 42);
+    assert.equal(result.data.historical, true);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

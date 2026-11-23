@@ -13,5 +13,5 @@
   "cfg.claude.credentialsPath": "Claude 認証情報ファイルのパス（空 = ~/.claude/.credentials.json）",
   "cfg.claude.accountLabel": "ツールチップに表示する Claude アカウントラベル（自動メール検出より優先）",
   "cfg.codex.enabled": "Codex CLI の使用量を表示",
-  "cfg.codex.sessionsPath": "Codex セッションログのディレクトリ（空 = ~/.codex/sessions）"
+  "cfg.codex.sessionsPath": "指定した Codex セッションログを使用（空欄では現在のアカウントを取得）"
 }
