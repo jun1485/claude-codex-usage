@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.3.5 — 2026-11-23
+
+- Codex usage now reads the documented app-server rate-limit snapshot before falling back to local session logs
+- Usage displays identify used quota, remaining quota in the tooltip, and historical log or cached readings
+- Codex preserves quota window durations, separates scoped limits, and omits expired log values
+
 ## 0.3.4 — 2026-08-12
 
 - Codex and Claude tooltips now show the currently active account for easier multi-account identification

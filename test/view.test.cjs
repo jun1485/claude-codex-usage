@@ -62,7 +62,7 @@ test('compact 모드는 5시간 구간의 초기화 시간을 표시한다', () 
   const now = Date.parse('2026-07-16T00:00:00.000Z');
   Date.now = () => now;
   try {
-    assert.equal(buildStatusText(createSnapshot(now), 'compact'), '5h 37% (1h 30m)');
+    assert.equal(buildStatusText(createSnapshot(now), 'compact'), '5h 37% used (1h 30m)');
   } finally {
     Date.now = originalNow;
   }
@@ -74,7 +74,7 @@ test('full 모드는 각 사용량 구간의 초기화 시간을 표시한다', 
   const now = Date.parse('2026-07-16T00:00:00.000Z');
   Date.now = () => now;
   try {
-    assert.equal(buildStatusText(createSnapshot(now), 'full'), '5h 37% (1h 30m) · 7d 52% (2d 3h)');
+    assert.equal(buildStatusText(createSnapshot(now), 'full'), '5h 37% used (1h 30m) · 7d 52% used (2d 3h)');
   } finally {
     Date.now = originalNow;
   }
@@ -85,6 +85,9 @@ test('툴팁에 현재 계정 이메일을 표시한다', () => {
   const tooltip = buildTooltip('codex-usage-logo', 'Codex CLI Usage', createSnapshot(Date.now()), 80, 95);
 
   assert.match(tooltip.value, /Current account: \*\*user@example\.com\*\*/);
+  assert.match(tooltip.value, /5-hour used:/);
+  assert.match(tooltip.value, /Weekly used:/);
+  assert.match(tooltip.value, /63% remaining/);
 });
 
 // 표시값·경고 단계 반올림 일치 검증
