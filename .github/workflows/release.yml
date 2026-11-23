@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example v0.3.5)"
+        required: true
+        type: string
+      skip_marketplace:
+        description: "Skip VS Code Marketplace publishing"
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -11,9 +21,13 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -24,8 +38,8 @@ jobs:
       - name: Verify tag matches package version
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
-          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION" >&2
+          if [ "$PKG_VERSION" != "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG does not match package.json version $PKG_VERSION" >&2
             exit 1
           fi
       - name: Lint
@@ -33,20 +47,24 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Package extension
+        id: package
         run: npx vsce package --out extension.vsix
       - name: Publish to VS Code Marketplace
+        if: ${{ !inputs.skip_marketplace }}
         run: npx vsce publish --packagePath extension.vsix --pat "$VSCE_PAT" --skip-duplicate
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
       - name: Publish to Open VSX
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         run: npx --yes ovsx publish extension.vsix -p "$OVSX_PAT" --skip-duplicate
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
       - name: Create GitHub Release
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-          gh release create "$GITHUB_REF_NAME" extension.vsix \
-            --title "$GITHUB_REF_NAME" \
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+          gh release create "$RELEASE_TAG" extension.vsix \
+            --title "$RELEASE_TAG" \
             --notes "Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jjju.claude-codex-usage-monitor), [Open VSX](https://open-vsx.org/extension/jjju/claude-codex-usage-monitor), or [Windsurf Marketplace](https://marketplace.windsurf.com/extension/jjju/claude-codex-usage-monitor)."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
