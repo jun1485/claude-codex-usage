@@ -1,14 +1,13 @@
 import * as fs from 'fs/promises';
+import { createReadStream } from 'fs';
+import { createInterface } from 'readline';
 import * as os from 'os';
 import * as path from 'path';
 import { l10n } from 'vscode';
-import { UsageResult, UsageWindow, WindowKind } from './types';
+import { fetchCodexAppServerUsage } from './codex-app-server';
+import { codexWindow, UsageResult, UsageWindow } from './types';
 
-// 세션 로그 탐색 상한
-const MAX_FILES_TO_COLLECT = 24;
 const TAIL_READ_BYTES = 256 * 1024;
-// 세션 구간 판별 상한 (분)
-const SESSION_WINDOW_MAX_MINUTES = 360;
 
 interface CodexRateWindow {
   used_percent?: number | null;
@@ -18,6 +17,7 @@ interface CodexRateWindow {
 }
 
 interface CodexRateLimits {
+  limit_id?: string | null;
   primary?: CodexRateWindow | null;
   secondary?: CodexRateWindow | null;
   plan_type?: string | null;
@@ -37,76 +37,38 @@ interface CodexRateLimitRecord {
   recordedAt: Date;
 }
 
-interface CodexAuthData {
-  tokens?: {
-    id_token?: string;
-    account_id?: string;
-  };
-}
-
-interface CodexIdTokenPayload {
-  email?: string;
-}
-
 // Codex 세션 디렉터리 기본 경로 결정
 export function resolveSessionsPath(customPath: string): string {
-  return customPath || path.join(os.homedir(), '.codex', 'sessions');
+  return customPath || path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'sessions');
 }
 
-// 현재 Codex 계정 식별 정보 조회
-async function readCodexAccount(sessionsDir: string): Promise<string | null> {
-  let auth: CodexAuthData;
-  try {
-    auth = JSON.parse(await fs.readFile(path.join(path.dirname(sessionsDir), 'auth.json'), 'utf8'));
-  } catch {
-    return null;
-  }
-
-  const encodedPayload = auth.tokens?.id_token?.split('.')[1];
-  if (encodedPayload) {
-    try {
-      const payload: CodexIdTokenPayload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-      if (payload.email) {
-        return payload.email;
-      }
-    } catch {}
-  }
-  return auth.tokens?.account_id ?? null;
-}
-
-// 이름 역순 우선 순회로 최신 jsonl 파일 수집
-async function collectRecentJsonlFiles(dir: string, out: string[], limit: number): Promise<void> {
+// 세션 로그 경로 수집
+async function collectJsonlFiles(dir: string, files: string[]): Promise<void> {
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
     return;
   }
-  // 연/월/일 디렉터리 구조 최신 날짜 우선 순회
-  entries.sort((a, b) => b.name.localeCompare(a.name));
   for (const entry of entries) {
-    if (out.length >= limit) {
-      return;
-    }
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await collectRecentJsonlFiles(full, out, limit);
+      await collectJsonlFiles(full, files);
     } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
-      out.push(full);
+      files.push(full);
     }
   }
 }
 
 // 파일 끝부분만 부분 읽기
-async function readTail(file: string, maxBytes: number): Promise<{ text: string; mtime: Date }> {
-  const stat = await fs.stat(file);
-  const start = Math.max(0, stat.size - maxBytes);
+async function readTail(file: string, size: number): Promise<string> {
+  const start = Math.max(0, size - TAIL_READ_BYTES);
   const handle = await fs.open(file, 'r');
   try {
-    const length = stat.size - start;
+    const length = size - start;
     const buffer = Buffer.alloc(length);
-    await handle.read(buffer, 0, length, start);
-    return { text: buffer.toString('utf8'), mtime: stat.mtime };
+    const { bytesRead } = await handle.read(buffer, 0, length, start);
+    return buffer.toString('utf8', 0, bytesRead);
   } finally {
     await handle.close();
   }
@@ -114,10 +76,15 @@ async function readTail(file: string, maxBytes: number): Promise<{ text: string;
 
 // 로그 라인의 사용량 제한 기록 추출
 function extractRateLimitRecord(line: string, fallbackRecordedAt: Date): CodexRateLimitRecord | null {
+  if (!line.includes('"rate_limits"')) return null;
   try {
     const parsed: CodexLogLine = JSON.parse(line);
     const rateLimits = parsed.payload?.rate_limits ?? parsed.rate_limits ?? null;
-    if (!rateLimits) {
+    if (
+      !rateLimits ||
+      (rateLimits.limit_id && rateLimits.limit_id !== 'codex') ||
+      ![rateLimits.primary?.used_percent, rateLimits.secondary?.used_percent].some(Number.isFinite)
+    ) {
       return null;
     }
     const recordedAt = typeof parsed.timestamp === 'string' ? new Date(parsed.timestamp) : fallbackRecordedAt;
@@ -141,37 +108,37 @@ function parseResetsAt(window: CodexRateWindow, recordedAt: Date): Date | null {
   return null;
 }
 
-// 윈도우 길이(분) 기준 구간 분류 (누락 시 기본 구간)
-function classifyWindow(window: CodexRateWindow, fallbackKind: WindowKind): WindowKind {
-  if (typeof window.window_minutes !== 'number' || window.window_minutes <= 0) {
-    return fallbackKind;
-  }
-  return window.window_minutes <= SESSION_WINDOW_MAX_MINUTES ? 'session' : 'weekly';
-}
+const recordCache = new Map<string, { mtime: number; size: number; record: CodexRateLimitRecord | null }>();
 
-// 사용량 구간 변환 (리셋 경과 시 0% 처리)
-function toUsageWindow(
-  window: CodexRateWindow | null | undefined,
-  fallbackKind: WindowKind,
-  recordedAt: Date,
-): UsageWindow | null {
-  if (!window || typeof window.used_percent !== 'number') {
-    return null;
+// 파일별 최근 사용량 기록 조회
+async function readLatestRecord(file: string): Promise<CodexRateLimitRecord | null> {
+  const { size, mtime } = await fs.stat(file);
+  const cached = recordCache.get(file);
+  if (cached?.mtime === mtime.getTime() && cached.size === size) return cached.record;
+  const tail = await readTail(file, size);
+  const lines = tail.split('\n');
+  let record: CodexRateLimitRecord | null = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    record = extractRateLimitRecord(lines[i], mtime);
+    if (record) break;
   }
-  const kind = classifyWindow(window, fallbackKind);
-  const resetsAt = parseResetsAt(window, recordedAt);
-  // 리셋 시각 경과 데이터 만료 처리
-  const expired = resetsAt !== null && resetsAt.getTime() <= Date.now();
-  return {
-    kind,
-    label: kind === 'session' ? '5h' : '7d',
-    percent: expired ? 0 : window.used_percent,
-    resetsAt: expired ? null : resetsAt,
-  };
+  // 긴 세션에서 꼬리 구간 앞에 남은 기록 복구
+  if (!record && size > TAIL_READ_BYTES) {
+    const stream = createReadStream(file, { encoding: 'utf8', end: size - 1 });
+    const reader = createInterface({ input: stream, crlfDelay: Infinity });
+    try {
+      for await (const line of reader) record = extractRateLimitRecord(line, mtime) ?? record;
+    } finally {
+      reader.close();
+      stream.destroy();
+    }
+  }
+  recordCache.set(file, { mtime: mtime.getTime(), size, record });
+  return record;
 }
 
 // 최신 세션 로그에서 Codex 사용량 조회
-export async function fetchCodexUsage(customSessionsPath: string): Promise<UsageResult> {
+export async function fetchCodexUsageFromLogs(customSessionsPath: string): Promise<UsageResult> {
   const sessionsDir = resolveSessionsPath(customSessionsPath);
   try {
     await fs.access(sessionsDir);
@@ -184,61 +151,65 @@ export async function fetchCodexUsage(customSessionsPath: string): Promise<Usage
   }
 
   const files: string[] = [];
-  await collectRecentJsonlFiles(sessionsDir, files, MAX_FILES_TO_COLLECT);
+  await collectJsonlFiles(sessionsDir, files);
+  const currentFiles = new Set(files);
+  for (const cached of recordCache.keys()) {
+    if (!currentFiles.has(cached)) recordCache.delete(cached);
+  }
   if (files.length === 0) {
     return { status: 'missing', message: l10n.t('No Codex session logs (run codex to populate)') };
   }
 
-  let latestUsage: { windows: UsageWindow[]; plan: string | null; recordedAt: Date } | null = null;
+  let latest: CodexRateLimitRecord | null = null;
   for (const file of files) {
-    let tail: { text: string; mtime: Date };
     try {
-      tail = await readTail(file, TAIL_READ_BYTES);
+      const record = await readLatestRecord(file);
+      if (record && (!latest || record.recordedAt > latest.recordedAt)) latest = record;
     } catch {
       continue;
     }
-    const lines = tail.text.split('\n');
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      const line = lines[i];
-      if (!line.includes('"rate_limits"')) {
-        continue;
-      }
-      const record = extractRateLimitRecord(line, tail.mtime);
-      if (!record) {
-        continue;
-      }
-      const windows = [
-        toUsageWindow(record.rateLimits.primary, 'session', record.recordedAt),
-        toUsageWindow(record.rateLimits.secondary, 'weekly', record.recordedAt),
-      ]
-        .filter((w): w is UsageWindow => w !== null)
-        .sort((a, b) => (a.kind === 'session' ? 0 : 1) - (b.kind === 'session' ? 0 : 1));
-      if (windows.length === 0) {
-        continue;
-      }
-      if (!latestUsage || record.recordedAt.getTime() > latestUsage.recordedAt.getTime()) {
-        latestUsage = {
+  }
+  if (latest) {
+    const { rateLimits, recordedAt } = latest;
+    const windows = (
+      [
+        ['session', rateLimits.primary],
+        ['weekly', rateLimits.secondary],
+      ] as const
+    )
+      .map(
+        ([kind, window]) =>
+          window && codexWindow(window.used_percent, window.window_minutes, parseResetsAt(window, recordedAt), kind),
+      )
+      .filter((w): w is UsageWindow => !!w)
+      .sort((a, b) => Number(b.kind === 'session') - Number(a.kind === 'session'));
+    if (windows.length) {
+      return {
+        status: 'ok',
+        data: {
           windows,
-          plan: record.rateLimits.plan_type ?? null,
-          recordedAt: record.recordedAt,
-        };
-      }
-      break;
+          plan: rateLimits.plan_type ?? null,
+          account: null,
+          fetchedAt: recordedAt,
+          historical: true,
+          sourceNote: l10n.t('Fallback: session logs update only when Codex runs'),
+        },
+      };
     }
   }
 
-  if (latestUsage) {
-    return {
-      status: 'ok',
-      data: {
-        windows: latestUsage.windows,
-        plan: latestUsage.plan,
-        account: await readCodexAccount(sessionsDir),
-        fetchedAt: latestUsage.recordedAt,
-        sourceNote: l10n.t('Updates from session logs when Codex runs'),
-      },
-    };
+  return { status: 'missing', message: l10n.t('No usage records in session logs (run codex to refresh)') };
+}
+
+// Codex 사용량 최적 소스 조회
+export async function fetchCodexUsage(customSessionsPath: string): Promise<UsageResult> {
+  if (customSessionsPath) return fetchCodexUsageFromLogs(customSessionsPath);
+  const appServerResult = await fetchCodexAppServerUsage();
+  if (appServerResult.status !== 'error') {
+    return appServerResult;
   }
 
-  return { status: 'missing', message: l10n.t('No usage records in session logs (run codex to refresh)') };
+  // app-server 장애 시 세션 로그 대체
+  const logResult = await fetchCodexUsageFromLogs(customSessionsPath);
+  return logResult.status === 'ok' || logResult.status === 'absent' ? logResult : appServerResult;
 }
