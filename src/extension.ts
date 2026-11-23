@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { fetchClaudeUsage } from './claude';
+import { disposeCodexAppServer } from './codex-app-server';
 import { fetchCodexUsage, resolveSessionsPath } from './codex';
 import { RetryingWatcher } from './retrying-watcher';
 import { SingleFlight } from './single-flight';
@@ -27,6 +28,7 @@ interface ExtensionConfig {
   codexSessionsPath: string;
 }
 
+let watchLogChanges = true;
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let watchDebounce: ReturnType<typeof setTimeout> | undefined;
 // 비포커스 중 보류된 갱신 존재 여부
@@ -114,6 +116,9 @@ async function refreshAll(bindings: ProviderBinding[]): Promise<void> {
         binding.item.hide();
         return;
       }
+      const latestPath = binding.id === 'claude' ? latestConfig.claudeCredentialsPath : latestConfig.codexSessionsPath;
+      if (customPath !== latestPath) return;
+      if (binding.id === 'codex') watchLogChanges = result.status !== 'ok' || !!result.data.historical;
       const displayResult =
         binding.id === 'claude' && result.status === 'ok' && latestConfig.claudeAccountLabel
           ? { ...result, data: { ...result.data, account: latestConfig.claudeAccountLabel } }
@@ -128,6 +133,7 @@ function restartCodexWatcher(bindings: ProviderBinding[]): void {
   sessionsWatcher.stop();
   const config = getConfig();
   if (!config.codexEnabled) {
+    disposeCodexAppServer();
     return;
   }
   sessionsWatcher.start(() => {
@@ -141,10 +147,19 @@ function restartCodexWatcher(bindings: ProviderBinding[]): void {
     );
     // 연속 쓰기 이벤트 debounce 후 Codex만 갱신
     const scheduleRefresh = () => {
+      if (!watchLogChanges) return;
+      if (!vscode.window.state.focused) {
+        refreshSkippedWhileUnfocused = true;
+        return;
+      }
       if (watchDebounce) {
         clearTimeout(watchDebounce);
       }
       watchDebounce = setTimeout(() => {
+        if (!vscode.window.state.focused) {
+          refreshSkippedWhileUnfocused = true;
+          return;
+        }
         void refreshAll(bindings.filter((binding) => binding.id === 'codex'));
       }, 2000);
     };
@@ -276,6 +291,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     // 포커스 복귀 시 보류된 갱신 즉시 실행
     vscode.window.onDidChangeWindowState((state) => {
+      if (!state.focused) refreshSkippedWhileUnfocused = true;
       if (state.focused && refreshSkippedWhileUnfocused) {
         refreshSkippedWhileUnfocused = false;
         void refreshAll(bindings);
@@ -309,4 +325,5 @@ export function deactivate(): void {
     watchDebounce = undefined;
   }
   sessionsWatcher.stop();
+  disposeCodexAppServer();
 }

@@ -26,9 +26,10 @@ Hover any item for a full breakdown:
 
 ## What you see
 
-- Claude: `✳ 5h 7% (3h 12m)` — 5-hour window usage + time until its reset
-- Codex: `⬡ 7d 12% (6d 1h)` — weekly window usage + time until reset
-- Full mode: `5h 7% (3h 12m) · 7d 41% (2d 5h)` — each usage window + its reset time
+- Claude: `✳ 5h 7% used (3h 12m)` — 5-hour window usage + time until its reset
+- Codex: `⬡ 7d 12% used (6d 1h)` — weekly window used quota + time until reset
+- Full mode: `5h 7% used (3h 12m) · 7d 41% used (2d 5h)` — each usage window + its reset time
+- The history icon marks a Codex session log reading. Tooltips also show remaining quota.
 - Hover for details: 5-hour / weekly / per-model usage bars, reset times, and plan
 - Background turns orange at 80% usage and red at 95% (thresholds configurable)
 - Click for a quick menu: toggle Claude/Codex on or off, open settings, or refresh
@@ -38,9 +39,9 @@ Hover any item for a full breakdown:
 | Tool        | Source                                                                | How                                                                                                  |
 | ----------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Claude Code | OAuth token from `~/.claude/.credentials.json` or the macOS Keychain | Queries an Anthropic-hosted, undocumented usage endpoint (every 60s while the window is focused, configurable) |
-| Codex CLI   | Session logs in `~/.codex/sessions/**/*.jsonl`                        | Parses the latest `rate_limits` event (updates instantly via file watching)                          |
+| Codex CLI   | Codex app-server; session logs as fallback                              | Reads `account/rateLimits/read`; falls back to the latest local `rate_limits` event                   |
 
-Tokens and usage data stay on your machine. The extension has no telemetry or owned server; Claude usage requests go only to the Anthropic-hosted endpoint.
+Tokens and usage data stay on your machine. The extension has no telemetry or owned server; Claude usage requests go only to the Anthropic-hosted endpoint, and Codex authentication remains inside the local Codex app-server.
 
 If the extension helps your workflow, an honest Marketplace review is welcome. Reviews are never rewarded or incentivized.
 
@@ -55,19 +56,19 @@ If the extension helps your workflow, an honest Marketplace review is welcome. R
 | `claudeCodexUsage.claude.enabled`         | `true`    | Show Claude usage                                  |
 | `claudeCodexUsage.codex.enabled`          | `true`    | Show Codex usage                                   |
 | `claudeCodexUsage.claude.credentialsPath` | `""`      | Override Claude credentials file path              |
-| `claudeCodexUsage.codex.sessionsPath`     | `""`      | Override Codex sessions directory                  |
+| `claudeCodexUsage.codex.sessionsPath`     | `""`      | Read the specified logs instead of the live account                  |
 
 ## Requirements
 
 - Logged in to Claude Code (run `claude`, then `/login`)
-- Codex CLI usage history (session logs must exist for Codex data to appear)
+- Signed in to Codex. The extension can use the installed Codex executable or the executable bundled with the official Codex extension. The default fallback log path follows `CODEX_HOME` when set.
 
 ## Known limitations
 
 - If the Claude token has expired, running Claude Code once renews it automatically.
 - The Anthropic-hosted usage endpoint is undocumented and may change without notice.
-- Codex usage comes from session logs, so new data appears only when Codex runs (changes are picked up immediately). Windows whose reset time has already passed are shown as 0%.
-- A status bar item is hidden automatically when its tool is not detected (no `~/.claude` directory, or no `~/.codex/sessions` directory). It appears once the tool is used.
+- Codex usage uses live app-server data when available. The fallback source updates only when Codex writes session logs and is labeled in the tooltip. Expired log windows disappear until a new reading is available. The tooltip shows the event time for a log reading. Logs do not identify the account that generated the reading.
+- A status bar item is hidden when the tool cannot be detected. Codex can show live usage before it writes any session logs.
 - Refresh pauses while the window is unfocused and resumes (with an immediate refresh) on focus.
 
 ## Localization

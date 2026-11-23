@@ -13,5 +13,5 @@
   "cfg.claude.credentialsPath": "Claude credentials file path (empty = ~/.claude/.credentials.json)",
   "cfg.claude.accountLabel": "Claude account label shown in the tooltip (overrides automatic email detection)",
   "cfg.codex.enabled": "Show Codex CLI usage",
-  "cfg.codex.sessionsPath": "Codex session log directory (empty = ~/.codex/sessions)"
+  "cfg.codex.sessionsPath": "Read usage from this Codex session log directory (empty = live account lookup)"
 }
