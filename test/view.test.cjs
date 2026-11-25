@@ -87,7 +87,15 @@ test('툴팁에 현재 계정 이메일을 표시한다', () => {
   assert.match(tooltip.value, /Current account: \*\*user@example\.com\*\*/);
   assert.match(tooltip.value, /5-hour used:/);
   assert.match(tooltip.value, /Weekly used:/);
-  assert.match(tooltip.value, /63% remaining/);
+  assert.match(tooltip.value, /\*\*37%\*\* — resets in /);
+  assert.match(tooltip.value, /\*\*52%\*\* — resets in /);
+  assert.doesNotMatch(tooltip.value, /% remaining/);
+
+  const claude = createSnapshot(Date.now());
+  claude.windows.push({ kind: 'scoped', label: 'Fable 7d', percent: 1, resetsAt: null });
+  const claudeTooltip = buildTooltip('claude-usage-logo', 'Claude Code Usage', claude, 80, 95);
+  assert.match(claudeTooltip.value, /Fable 7d used: .*\*\*1%\*\*$/m);
+  assert.doesNotMatch(claudeTooltip.value, /% remaining/);
 });
 
 // 표시값·경고 단계 반올림 일치 검증

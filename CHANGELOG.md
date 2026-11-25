@@ -1,5 +1,9 @@
 # Change Log
 
+## 0.3.6 — 2026-11-25
+
+- Removed the remaining quota percentage from Claude and Codex tooltips
+
 ## 0.3.5 — 2026-11-23
 
 - Codex usage now reads the documented app-server rate-limit snapshot before falling back to local session logs

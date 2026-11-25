@@ -23,7 +23,6 @@
   "Not logged in to Codex": "Codex にログインしていません",
   "No Codex rate limit data": "Codex の使用上限データがありません",
   "{0} used": "{0} 使用",
-  "{0} remaining": "残り {0}",
   "Plan": "プラン",
   "Current account": "現在のアカウント",
   "resets in {0} ({1})": "リセットまで {0}（{1}）",

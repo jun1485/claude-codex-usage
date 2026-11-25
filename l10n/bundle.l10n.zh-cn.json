@@ -23,7 +23,6 @@
   "Not logged in to Codex": "尚未登录 Codex",
   "No Codex rate limit data": "没有 Codex 使用限额数据",
   "{0} used": "已用 {0}",
-  "{0} remaining": "剩余 {0}",
   "Plan": "套餐",
   "Current account": "当前账户",
   "resets in {0} ({1})": "{0}后重置（{1}）",
