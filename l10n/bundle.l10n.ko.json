@@ -23,7 +23,6 @@
   "Not logged in to Codex": "Codex에 로그인되어 있지 않음",
   "No Codex rate limit data": "Codex 사용 한도 데이터가 없음",
   "{0} used": "{0} 사용",
-  "{0} remaining": "{0} 잔여",
   "Plan": "플랜",
   "Current account": "현재 계정",
   "resets in {0} ({1})": "리셋 {0} 후 ({1})",

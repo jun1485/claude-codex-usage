@@ -149,7 +149,7 @@ class CodexAppServerClient {
           clientInfo: {
             name: 'claude_codex_usage_monitor',
             title: 'Claude Code Usage & Codex Usage Monitor',
-            version: '0.3.5',
+            version: '0.3.6',
           },
         },
       });

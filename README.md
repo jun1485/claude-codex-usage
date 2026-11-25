@@ -29,7 +29,7 @@ Hover any item for a full breakdown:
 - Claude: `✳ 5h 7% used (3h 12m)` — 5-hour window usage + time until its reset
 - Codex: `⬡ 7d 12% used (6d 1h)` — weekly window used quota + time until reset
 - Full mode: `5h 7% used (3h 12m) · 7d 41% used (2d 5h)` — each usage window + its reset time
-- The history icon marks a Codex session log reading. Tooltips also show remaining quota.
+- The history icon marks a Codex session log reading.
 - Hover for details: 5-hour / weekly / per-model usage bars, reset times, and plan
 - Background turns orange at 80% usage and red at 95% (thresholds configurable)
 - Click for a quick menu: toggle Claude/Codex on or off, open settings, or refresh

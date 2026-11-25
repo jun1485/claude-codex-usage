@@ -129,7 +129,7 @@ export function buildTooltip(
   }
   for (const window of data.windows) {
     lines.push(
-      `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}** (${vscode.l10n.t('{0} remaining', formatPercent(Math.max(0, 100 - Math.round(window.percent))))})${formatResetDetail(window.resetsAt)}`,
+      `${severityIcon(window.percent, warningThreshold, errorThreshold)}${windowDisplayName(window)}: ${buildMeter(window.percent)} **${formatPercent(window.percent)}**${formatResetDetail(window.resetsAt)}`,
     );
   }
   const sourceSuffix = data.sourceNote ? ` · ${data.sourceNote}` : '';
